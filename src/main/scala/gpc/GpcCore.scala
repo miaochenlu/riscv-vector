@@ -575,6 +575,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     alu_p1.io.in1 := ex_p1_op1.asUInt
 
     //---- Branch/JAL(R) of EX stage ----
+    val ex_misprediction_sent = RegInit(false.B)
     val ex_br_ctrl = ex_reg_uops(1).ctrl
     val ex_jalx = ex_br_ctrl.jal || ex_br_ctrl.jalr
     val ex_cfi = ex_br_ctrl.branch || ex_br_ctrl.jal || ex_br_ctrl.jalr
@@ -855,14 +856,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_nl_pc = (m2_reg_uops(1).pc.asSInt + Mux(m2_reg_uops(1).rvc, 2.S, 4.S)).asUInt
     val m2_npc = (Mux(m2_jalx, encodeVirtualAddress(aluM2_p1.io.out, aluM2_p1.io.out).asSInt,
       m2_br_target) & (-2).S).asUInt
-    // NPC for pipe0 flush
-    val m2_npc_flush = (m2_reg_uops(0).pc.asSInt + Mux(m2_reg_uops(0).rvc, 2.S, 4.S) & (-2).S).asUInt
     val m2_wrong_npc = m2_cfi &&
       Mux(m2_br_ctrl.branch, m2_br_taken =/= m2_reg_uops(1).btb_resp.bht.taken, m2_npc =/= m2_npc_predict)
     val m2_npc_misaligned = !csr.io.status.isa('c' - 'a') && m2_npc(1)
     val m2_cfi_taken = (m2_br_ctrl.branch && m2_br_taken) || m2_br_ctrl.jalr || m2_br_ctrl.jal
     val m2_direction_misprediction = m2_br_ctrl.branch && m2_br_taken =/= m2_reg_uops(1).btb_resp.bht.taken
-    val m2_misprediction = m2_wrong_npc
+    val m2_misprediction = m2_wrong_npc && !ex_misprediction_sent
 
     val m2_alu_wdata_p1 = Mux(m2_jalx, m2_nl_pc, aluM2_p1.io.out)
 
@@ -895,6 +894,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       m2_reg_xcpt(i) := m1_xcpt(i) && !take_pc_m2
     }
     m2_reg_flush_pipe := !ctrl_killm1(0) && m1_reg_flush_pipe
+    // NPC for pipe0 flush
+    val m2_npc_flush = (m2_reg_uops(0).pc.asSInt + Mux(m2_reg_uops(0).rvc, 2.S, 4.S) & (-2).S).asUInt
 
     val vxcpt_cause = Reg(new VLdstXcpt)
     val vxcpt_cause_case = Mux1H(Seq(
@@ -928,6 +929,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction //TODO - sfence adding
     val take_pc_m2_p1_others = replay_m2(1) || m2_xcpt(1)
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
+
+    when(take_pc_ex_p1) {
+      ex_misprediction_sent := true.B
+    }.elsewhen(m2_reg_valids(1)) {
+      ex_misprediction_sent := false.B
+    }
 
     // M2 write arbitration
     val dmem_resp_xpu = !io.dmem.resp.bits.tag(0).asBool
