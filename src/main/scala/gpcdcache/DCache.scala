@@ -69,7 +69,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   mainReqArb.io.in(0) <> probeQueue.io.mainPipeReq
   // source 1: replace
   mainReqArb.io.in(1).valid := mshrs.io.toReplace.valid
-  mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, victimWay, edge.bundle)
+  mainReqArb.io.in(1).bits  := MainPipeReqConverter(mshrs.io.toReplace.bits, edge.bundle)
   mshrs.io.toReplace.ready  := mainReqArb.io.in(1).ready
   // source 2: req
   mainReqArb.io.in(2).valid := io.req.valid
@@ -96,13 +96,13 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // read tag array
   metaArray.io.read.valid       := s0_valid
   metaArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
-  metaArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
+  metaArray.io.read.bits.wayEn  := Fill(nWays, true.B)
 
   // read data array
   dataArray.io.read.valid       := s0_valid
   dataArray.io.read.bits.setIdx := getSetIdx(s0_req.paddr)
   dataArray.io.read.bits.bankEn := UIntToOH(getBankIdx(s0_req.paddr)) // useless now
-  dataArray.io.read.bits.wayEn  := Mux(s0_req.isRefill, UIntToOH(s0_req.refillWay), Fill(nWays, true.B))
+  dataArray.io.read.bits.wayEn  := Fill(nWays, true.B)
   // * pipeline stage 0 End
 
   // * pipeline stage 1 Begin
@@ -113,6 +113,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_validFromCore = s1_valid && s1_req.isFromCore
   val s1_validProbe    = s1_valid && s1_req.isProbe
   val s1_validRefill   = s1_valid && s1_req.isRefill
+  val s1_refillWay     = victimWay
 
   assert(!s1_validProbe || (s1_validProbe && s1_cacheable))
   assert(!s1_validRefill || (s1_validRefill && s1_cacheable))
@@ -144,7 +145,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s1_metaPreBypass = Mux(
     s1_req.isRefill,
-    s1_metaArrayResp(s1_req.refillWay),
+    s1_metaArrayResp(s1_refillWay),
     Mux1H(s1_tagMatchWayPreBypassVec, s1_metaArrayResp),
   )
 
@@ -163,8 +164,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_dataHitWay = Mux1H(s1_tagMatchWayPreBypassVec, s1_dataArrayResp)
   val s1_dataPreBypass = Mux(
     s1_req.isRefill,
-    s1_dataArrayResp(s1_req.refillWay), // get replace data
-    s1_dataHitWay,                      // select hit way data
+    s1_dataArrayResp(s1_refillWay), // get replace data
+    s1_dataHitWay,                  // select hit way data
   ).asUInt
 
   val s1_data = Mux(s1_bypassStore.valid, s1_bypassStore.bits.data, s1_dataPreBypass)
@@ -200,25 +201,28 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * cpu lrsc
   // NOTE: when lrscValid -> block probe & replace to lrscAddr
-  val lrscCount = RegInit(0.U)
-  val lrscValid = lrscCount > lrscBackoff.U // FIXME lrscBackOff  probe interval
+  val lrscCount      = RegInit(0.U)
+  val lrscValid      = lrscCount > lrscBackoff.U // FIXME lrscBackOff probe interval
+  val lrscBackingOff = lrscCount > 0.U && !lrscValid
 
   val s1_lr = s1_validFromCore && (s1_req.cmd === M_XLR)
   val s1_sc = s1_validFromCore && (s1_req.cmd === M_XSC)
 
   val lrscAddr         = RegEnable(getLineAddr(s1_req.paddr), s1_lr)
   val s1_lrscAddrMatch = lrscValid && (getLineAddr(s1_req.paddr) === lrscAddr)
-  val s1_lrFail        = s1_lr && !s1_hit
+  val s1_lrFail        = s1_lr && (!s1_hit || lrscCount > 0.U)
   val s1_scFail        = s1_sc && (!s1_hit || !s1_lrscAddrMatch)
 
   lrscCount := MuxCase(
     lrscCount,
     Seq(
+      // probe during backingOff
+      s1_validProbe -> 0.U,
       // lr hit
-      (s1_hit && s1_lr) -> (lrscCycles - 1).U,
-      // (sc | other cmd) after lr hit
-      (s1_validFromCore & (lrscCount > 0.U)) -> 0.U,
-      // no cmd after lr hit
+      (s1_hit && s1_lr && (lrscCount === 0.U)) -> (lrscCycles - 1).U,
+      // lr after lr | sc | other cmd
+      (s1_validFromCore && lrscValid) -> lrscBackoff.U,
+      // no valid cmd after lr hit
       (lrscCount > 0.U) -> (lrscCount - 1.U),
     ),
   )
@@ -286,7 +290,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     s1_tagMatchWayVec,
     Seq(
       s1_validProbe    -> s1_tagMatchWayVec,
-      s1_validRefill   -> VecInit(UIntToOH(s1_req.refillWay).asBools),
+      s1_validRefill   -> VecInit(UIntToOH(s1_refillWay).asBools),
       s1_validFromCore -> s1_tagMatchWayVec,
     ),
   ).asUInt
@@ -298,6 +302,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_valid      = RegNext(s1_needUpdate)
   val s2_wayEn      = RegEnable(s1_wayEn, s1_needUpdate)
   val s2_newCoh     = RegEnable(s1_newCoh, s1_needUpdate)
+  val s2_repCoh     = RegEnable(s1_repCoh, s1_needUpdate)
   val s2_updateMeta = RegNext(s1_updateMeta)
   val s2_updateData = RegNext(s1_updateData)
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
@@ -339,6 +344,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s3_valid      = RegNext(s2_valid)
   val s3_req        = RegEnable(s2_req, s2_valid)
   val s3_newCoh     = RegEnable(s2_newCoh, s2_valid)
+  val s3_repCoh     = RegEnable(s2_repCoh, s2_valid)
   val s3_wayEn      = RegEnable(s2_wayEn, s2_valid)
   val s3_tag        = RegEnable(s2_tag, s2_valid)
   val s3_updateMeta = RegNext(s2_updateMeta)
@@ -372,6 +378,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s4_valid  = RegNext(s3_valid)
   val s4_req    = RegEnable(s3_req, s3_valid)
   val s4_newCoh = RegEnable(s3_newCoh, s3_valid)
+  val s4_repCoh = RegEnable(s3_repCoh, s3_valid)
   val s4_wayEn  = RegEnable(s3_wayEn, s3_valid)
   val s4_tag    = RegEnable(s3_tag, s3_valid)
   // * pipeline stage 4 End
@@ -384,13 +391,19 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s4_bypassStoreCandidate = createBypassStore(s4_req.wdata, getTag(s4_req.paddr), s4_newCoh, s4_wayEn)
 
   val bypassList = List(
-    (s2_valid, s2_req, s2_bypassStoreCandidate, s2_tag),
-    (s3_valid, s3_req, s3_bypassStoreCandidate, s3_tag),
-    (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag),
+    (s2_valid, s2_req, s2_bypassStoreCandidate, s2_tag, s2_repCoh),
+    (s3_valid, s3_req, s3_bypassStoreCandidate, s3_tag, s3_repCoh),
+    (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag, s4_repCoh),
   ).map(r =>
     (
-      r._1 && getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr),
-      r._1 && r._2.isRefill && (getLineAddr(s1_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))),
+      r._1 &&
+        // s1 access/refill addr = s2/s3/s4 access/refill addr
+        ((getLineAddr(s1_req.paddr) === getLineAddr(r._2.paddr)) ||
+          // s1 replace way = s2/s3/s4 access/refill way; same set same way
+          (getSetIdx(r._2.paddr) === getSetIdx(s1_req.paddr) &&
+            (s1_refillWay === OHToUInt(r._3.wayEn) && s1_req.isRefill))),
+      r._1 && r._2.isRefill && r._5.state > ClientStates.Nothing &&
+        (getLineAddr(s1_req.paddr) === Cat(r._4, getSetIdx(r._2.paddr))), // s1 access addr = s2/s3/s4 replace addr
       r._3,
     )
   )
@@ -435,8 +448,9 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
 
   val mshrReq = WireDefault(s1_req)
-  mshrReq.wdata := s2_mshrStoreData
-  mshrReq.wmask := s2_mshrStoreMaskInBytes
+  mshrReq.wdata   := s2_mshrStoreData
+  mshrReq.wmask   := s2_mshrStoreMaskInBytes
+  mshrReq.noAlloc := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
 
   mshrs.io.req.valid := s1_mshrAlloc
   mshrs.io.req.bits  := mshrReq

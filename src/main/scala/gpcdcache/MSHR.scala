@@ -4,6 +4,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
+import freechips.rocketchip.tilelink
 
 class MSHR(id: Int) extends Module() {
   val io = IO(new MSHREntryIO)
@@ -38,20 +39,22 @@ class MSHR(id: Int) extends Module() {
   val probeState = Mux(
     state > mode_resp_wait,
     ProbeMSHRState.hitBlockB,
-    MuxLookup(io.probePermission, ProbeMSHRState.hitBlockB)(
+    MuxLookup(io.probePermission, ProbeMSHRState.hitGo)(
       Seq(
         TLPermissions.toN -> ProbeMSHRState.hitBlockN,
         TLPermissions.toB -> Mux(
           sentPermission === TLPermissions.NtoB,
           ProbeMSHRState.hitGo,
-          ProbeMSHRState.hitBlockB,
+          ProbeMSHRState.hitBlockN,
         ),
       )
     ),
   )
 
-  io.probeState         := Mux(probeReq, probeState, ProbeMSHRState.miss)
-  io.probeLineAddrMatch := lineAddrReg === io.probeLineAddr && probeReq
+  io.probeState := Mux(probeReq && io.probeLineAddrMatch, probeState, ProbeMSHRState.miss)
+  io.probeLineAddrMatch := (lineAddrReg === io.probeLineAddr) &&
+    probeReq &&
+    (state =/= mode_idle)
 
   readAfterWriteFlag := MuxCase(
     readAfterWriteFlag,
@@ -114,14 +117,13 @@ class MSHR(id: Int) extends Module() {
         sentPermission,
       )
     }
+  }.elsewhen(probeReq && io.probeLineAddrMatch) {
+    sentPermission := Mux(
+      io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
+      TLPermissions.NtoT,
+      sentPermission,
+    )
   }
-//    .elsewhen(probeReq) {
-//    sentPermission := Mux(
-//      io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
-//      TLPermissions.NtoT,
-//      sentPermission,
-//    )
-//  }
 
   // enqueue the sender
   io.senderPermission := sentPermission
@@ -335,6 +337,7 @@ class MSHRFile extends Module() {
   allocateArb.io.out.ready := allocReq && !lineAddrMatch
 
   // interface for probe
+  val senderPermissionList   = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
   val probeReq               = io.probeCheck.valid
   val probeLineAddrMatchList = Wire(Vec(nMSHRs, Bool()))
   val probeLineAddrMatch     = probeLineAddrMatchList.asUInt.orR
@@ -342,14 +345,23 @@ class MSHRFile extends Module() {
 
   val probeStateList = Wire(Vec(nMSHRs, UInt(ProbeMSHRState.width.W)))
   val probeState     = probeStateList.reduce(_ | _)
-  io.probeCheck.replaceFinish := io.replaceStatus === ReplaceStatus.replace_finish &&
-    io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
+  io.probeCheck.replaceFinish :=
+    io.replaceStatus === ReplaceStatus.replace_finish &&
+      io.probeCheck.lineAddr === replayReg.io.toReplace.bits.lineAddr
 
   io.probeRefill.valid        := io.probeCheck.valid
   io.probeRefill.bits.entryId := probeLineAddrMatchIdx
 
-  io.probeCheck.pass := probeReq && (probeState === ProbeMSHRState.hitGo | (probeState === ProbeMSHRState.hitBlockN && !io.fromRefill.bits.probeMatch))
+  io.probeCheck.pass := probeReq &&
+    (probeState === ProbeMSHRState.hitGo |
+      (probeState === ProbeMSHRState.hitBlockN &&
+        !io.fromRefill.bits.probeMatch))
   io.probeCheck.hit := probeReq && probeLineAddrMatch
+  io.probeCheck.probeCoh := Mux(
+    senderPermissionList(probeLineAddrMatchIdx) === TLPermissions.BtoT,
+    ClientStates.Branch,
+    ClientStates.Nothing,
+  )
 
   // interface for replay
   val writeCounterList  = Wire(Vec(nMSHRs, UInt(log2Up(nMSHRMetas).W)))
@@ -367,8 +379,7 @@ class MSHRFile extends Module() {
   val senderRespList = Wire(Vec(nMSHRs, Bool()))
   // val senderIdx      = OHToUInt(senderReqList)
 
-  val lineAddrList         = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
-  val senderPermissionList = Wire(Vec(nMSHRs, UInt(TLPermissions.aWidth.W)))
+  val lineAddrList = Wire(Vec(nMSHRs, UInt(lineAddrWidth.W)))
 
   val mshrEmptyList = Wire(Vec(nMSHRs, Bool()))
   io.fenceRdy := mshrEmptyList.asUInt.andR
