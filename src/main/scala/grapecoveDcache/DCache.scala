@@ -201,25 +201,28 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * cpu lrsc
   // NOTE: when lrscValid -> block probe & replace to lrscAddr
-  val lrscCount = RegInit(0.U)
-  val lrscValid = lrscCount > lrscBackoff.U // FIXME lrscBackOff  probe interval
+  val lrscCount      = RegInit(0.U)
+  val lrscValid      = lrscCount > lrscBackoff.U // FIXME lrscBackOff probe interval
+  val lrscBackingOff = lrscCount > 0.U && !lrscValid
 
   val s1_lr = s1_validFromCore && (s1_req.cmd === M_XLR)
   val s1_sc = s1_validFromCore && (s1_req.cmd === M_XSC)
 
   val lrscAddr         = RegEnable(getLineAddr(s1_req.paddr), s1_lr)
   val s1_lrscAddrMatch = lrscValid && (getLineAddr(s1_req.paddr) === lrscAddr)
-  val s1_lrFail        = s1_lr && !s1_hit
+  val s1_lrFail        = s1_lr && (!s1_hit || lrscCount > 0.U)
   val s1_scFail        = s1_sc && (!s1_hit || !s1_lrscAddrMatch)
 
   lrscCount := MuxCase(
     lrscCount,
     Seq(
+      // probe during backingOff
+      s1_validProbe -> 0.U,
       // lr hit
-      (s1_hit && s1_lr) -> (lrscCycles - 1).U,
-      // (sc | other cmd) after lr hit
-      (s1_validFromCore & (lrscCount > 0.U)) -> 0.U,
-      // no cmd after lr hit
+      (s1_hit && s1_lr && (lrscCount === 0.U)) -> (lrscCycles - 1).U,
+      // lr after lr | sc | other cmd
+      (s1_validFromCore && lrscValid) -> lrscBackoff.U,
+      // no valid cmd after lr hit
       (lrscCount > 0.U) -> (lrscCount - 1.U),
     ),
   )
