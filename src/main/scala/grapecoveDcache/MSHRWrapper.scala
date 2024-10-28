@@ -31,8 +31,10 @@ class MSHRWrapper(
   val mshrs   = Module(new MSHRFile())
   val iomshrs = Module(new IOMSHRFile())
 
-  val validIOMSHRReq = (!io.cacheable || isAMO(io.req.bits.cmd) || io.req.bits.noAlloc) && !mshrs.io.addrMatch
-  val validMSHRReq = (io.cacheable && !isAMO(io.req.bits.cmd) && !io.req.bits.noAlloc && !iomshrs.io.addrMatch) ||
+  val amoReq = isAMO(io.req.bits.cmd)
+  dontTouch(amoReq)
+  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) && !mshrs.io.addrMatch
+  val validMSHRReq = (io.cacheable && !amoReq && !io.req.bits.noAlloc && !iomshrs.io.addrMatch) ||
     (io.req.bits.noAlloc && mshrs.io.addrMatch)
 
   // req signal connect
