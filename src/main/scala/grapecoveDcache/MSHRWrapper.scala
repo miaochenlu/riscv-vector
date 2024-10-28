@@ -37,7 +37,7 @@ class MSHRWrapper(
   val validMSHRReq = Mux(
     amoReq || !io.cacheable || iomshrs.io.addrMatch,
     false.B,
-    io.req.bits.noAlloc && mshrs.io.addrMatch,
+    Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
   )
 
   // req signal connect
