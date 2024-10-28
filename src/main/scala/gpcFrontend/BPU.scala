@@ -218,7 +218,7 @@ def getresult(addr: UInt, rvalid: Bool): BHTResp = {
   val tagHit = Mux(choice_rdata(1),notTakenTagMatch,takenTagMatch)
   val directionData = Mux(choice_rdata(1),not_taken_array_rdata,taken_array_rdata)
 
-  res.value := Mux(tagHit,directionData,choice_rdata)
+  res.value := Mux(resetting, 0.U, Mux(tagHit,directionData,choice_rdata))
   res.history := globalHistory
   res.hasBias := tagHit
   res
