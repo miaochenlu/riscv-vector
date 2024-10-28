@@ -865,10 +865,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     val m2_alu_wdata_p1 = Mux(m2_jalx, m2_nl_pc, aluM2_p1.io.out)
 
-    val m2_pc_valids = Wire(Vec(2, Bool()))
+    val m1_pc_valids = Wire(Vec(2, Bool()))
     for (i <- 0 until 2) {
-      m2_pc_valids(i) := !ctrl_killm1(i) || m1_replay_intrp(i)
-      when(m2_pc_valids(i)) {
+      m1_pc_valids(i) := !ctrl_killm1(i) || m1_replay_intrp(i)
+      when(m1_pc_valids(i)) {
         m2_reg_uops(i) := m1_reg_uops(i)
         m2_reg_uops(i).rs_ready := m1_rs_ready(i)
         m2_reg_uops(i).wdata_ready := m1_reg_uops(i).wdata_ready
@@ -1263,7 +1263,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
             Mux(m2_reg_flush_pipe, m2_npc_flush, m2_npc)))) //FIXME - m2_npc   // flush or branch misprediction
     io.imem.flush_icache := m2_reg_valids(0) && m2_reg_uops(0).ctrl.fence_i && !io.dmem.s2_nack
     io.imem.might_request := {
-      imem_might_request_reg := ex_reg_valids.orR || m1_reg_valids.orR || io.ptw.customCSRs.disableICacheClockGate
+      imem_might_request_reg := id_pc_valids.orR || m1_pc_valids.orR || io.ptw.customCSRs.disableICacheClockGate
       imem_might_request_reg //TODO - ex_reg_valid --> ex_pc_valid
     }
     io.imem.progress := RegNext(m2_reg_valids(0) && !replay_m2(0) ||
