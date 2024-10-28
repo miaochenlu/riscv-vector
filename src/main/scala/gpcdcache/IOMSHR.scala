@@ -179,6 +179,7 @@ class IOMSHRFile(
 
   io.fromRefill.ready := state === mode_idle
 
+  dontTouch(replayFinishList)
   replayFinishList := Mux(
     io.resp.fire,
     UIntToOH(respIOMSHRIdx),
