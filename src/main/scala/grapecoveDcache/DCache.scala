@@ -77,7 +77,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   io.req.ready              := mainReqArb.io.in(2).ready
 
   // FIXME: store ready ?
-  mainReqArb.io.out.ready := Mux(
+  mainReqArb.io.out.ready := metaArray.io.read.ready && Mux(
     mainReqArb.io.out.bits.isFromCore,
     !(io.nextCycleWb || (io.resp.valid && io.resp.bits.status === CacheRespStatus.replay)),
     true.B,
