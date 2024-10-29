@@ -48,4 +48,9 @@ object Main extends App {
 
   lazy val dcacheWrapper = LazyModule(new DCacheWrapper()(Parameters.empty))
   ChiselStage.emitSystemVerilogFile(dcacheWrapper.dcacheClient.module, args, firtoolOptions)
+  // ChiselStage.emitSystemVerilogFile(
+  //   dcacheWrapper.dcacheClient.module,
+  //   args ++ Array("--split-verilog"),
+  //   firtoolOptions,
+  // )
 }

@@ -571,7 +571,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.bits.status := MuxCase(
     CacheRespStatus.miss,
     Seq(
-      s1_hit
+      (s1_hit && !s1_lrFail)
         -> CacheRespStatus.hit,
       (s1_wbqBlockMiss |   // miss addr exist in wbq
         s1_mshrAllocFail | // miss but mshr full
