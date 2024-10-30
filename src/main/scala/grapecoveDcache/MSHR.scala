@@ -101,32 +101,34 @@ class MSHR(id: Int) extends Module() {
   }
 
   /////////////// sent info
+  val mshrPerm = WireInit(sentPermission)
   when(state === mode_clear) {
-    sentPermission := TLPermissions.NtoB
+    mshrPerm := TLPermissions.NtoB
   }.elsewhen(allocateReq && !stallReq) {
     when(state === mode_idle) {
-      sentPermission := Mux(
+      mshrPerm := Mux(
         io.isUpgrade,
         TLPermissions.BtoT,
         Mux(isWriteIntent(io.reqCmd), TLPermissions.NtoT, TLPermissions.NtoB),
       )
     }.elsewhen(allocLineAddrMatch && !isPrefetch(io.reqCmd)) {
-      sentPermission := Mux(
+      mshrPerm := Mux(
         sentPermission === TLPermissions.NtoB && isWriteIntent(io.reqCmd),
         TLPermissions.NtoT,
         sentPermission,
       )
     }
   }.elsewhen(probeReq && io.probeLineAddrMatch) {
-    sentPermission := Mux(
+    mshrPerm := Mux(
       io.probePermission === TLPermissions.toN && sentPermission === TLPermissions.BtoT,
       TLPermissions.NtoT,
       sentPermission,
     )
   }
+  sentPermission := mshrPerm
 
   // enqueue the sender
-  io.senderPermission := sentPermission
+  io.senderPermission := mshrPerm
 
   io.senderLineAddr := lineAddrReg
 
@@ -480,8 +482,8 @@ class MSHRFile extends Module() {
   senderQueue.io.enq.valid := allocateList.asUInt.orR
   senderQueue.io.enq.bits  := allocateIdx
 
-  io.toL2Req.valid         := senderQueue.io.deq.valid && !dataArrayWriteEna
-  senderQueue.io.deq.ready := io.toL2Req.ready && !dataArrayWriteEna
+  io.toL2Req.valid         := senderQueue.io.deq.valid // && !dataArrayWriteEna
+  senderQueue.io.deq.ready := io.toL2Req.ready         // && !dataArrayWriteEna
   io.toL2Req.bits.perm     := senderPermissionList(senderQueue.io.deq.bits)
   io.toL2Req.bits.entryId  := senderQueue.io.deq.bits
   io.toL2Req.bits.lineAddr := lineAddrList(senderQueue.io.deq.bits)
