@@ -35,6 +35,7 @@ class MSHR(id: Int) extends Module() {
   val readAfterWriteFlag = RegInit(false.B)
   val trueWriteFlag      = RegInit(false.B)
   val wrwErr             = readAfterWriteFlag && isWrite(io.reqCmd)
+  val hasLr              = RegInit(false.B)
 
   val probeState = Mux(
     state > mode_resp_wait,
@@ -64,12 +65,23 @@ class MSHR(id: Int) extends Module() {
     ),
   )
 
+  hasLr := MuxCase(
+    hasLr,
+    Seq(
+      (state === mode_clear)                         -> false.B,
+      (!hasLr && allocateReq && io.reqCmd === M_XLR) -> true.B,
+    ),
+  )
+  val succLrReq = hasLr && io.reqCmd === M_XLR
+
   // don't have enough space to store current inst
   val isFull = metaCounter === (nMSHRMetas - 1).asUInt
 //  dontTouch(isFull)
 
   val stallReq =
-    allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr) && !isPrefetch(io.reqCmd)
+    allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr || succLrReq) && !isPrefetch(
+      io.reqCmd
+    )
   io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
 
