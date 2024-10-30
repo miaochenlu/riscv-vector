@@ -31,10 +31,18 @@ class MSHRWrapper(
   val mshrs   = Module(new MSHRFile())
   val iomshrs = Module(new IOMSHRFile())
 
+  val inReplayLr = RegInit(false.B)
+  when(inReplayLr && io.req.bits.cmd =/= M_XLR) {
+    inReplayLr := false.B
+  }.elsewhen(!inReplayLr && io.req.bits.cmd === M_XLR) {
+    inReplayLr := true.B
+  }
+  val muteLr = io.req.bits.cmd === M_XLR && inReplayLr
+
   val amoReq = isAMO(io.req.bits.cmd)
   dontTouch(amoReq)
-  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) && !mshrs.io.addrMatch
-  val validMSHRReq = Mux(
+  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) && !mshrs.io.addrMatch && !muteLr
+  val validMSHRReq = !muteLr && Mux(
     amoReq || !io.cacheable || iomshrs.io.addrMatch,
     false.B,
     Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
