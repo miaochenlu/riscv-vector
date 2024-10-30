@@ -32,10 +32,12 @@ class MSHRWrapper(
   val iomshrs = Module(new IOMSHRFile())
 
   val inReplayLr = RegInit(false.B)
-  when(inReplayLr && io.req.bits.cmd =/= M_XLR) {
-    inReplayLr := false.B
-  }.elsewhen(!inReplayLr && io.req.bits.cmd === M_XLR) {
-    inReplayLr := true.B
+  when(io.req.valid) {
+    when(inReplayLr && io.req.bits.cmd =/= M_XLR) {
+      inReplayLr := false.B
+    }.elsewhen(!inReplayLr && io.req.bits.cmd === M_XLR) {
+      inReplayLr := true.B
+    }
   }
   val muteLr = io.req.bits.cmd === M_XLR && inReplayLr
 
