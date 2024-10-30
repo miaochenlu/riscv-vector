@@ -335,6 +335,28 @@ class CSRFileIO(hasBeu: Boolean)(implicit p: Parameters) extends CoreBundle
     val set_vstart = Flipped(Valid(vstart))
     val set_vxsat = Input(Bool())
   })
+
+  val mepc = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mtval = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mtvec = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mcause = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mip = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mie = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mscratch = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mideleg = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val medeleg = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val minstret = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val sstatus = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val sepc = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val stval = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val stvec = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val scause = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val satp = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val sscratch = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val vtype = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val vcsr = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val vl = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val vstart = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
 }
 
 class VConfig(implicit p: Parameters) extends CoreBundle {
@@ -789,6 +811,14 @@ class CSRFile(
     read_sstatus.spp := io.status.spp
     read_sstatus.spie := io.status.spie
     read_sstatus.sie := io.status.sie
+
+    // For verification
+    val sstatus = Wire(Vec(NRET, UInt(xLen.W)))
+
+    for (i <- 0 until NRET) {
+      sstatus(i) := (read_sstatus.asUInt)(xLen - 1, 0)
+    }
+    io.sstatus.get := sstatus.asUInt
 
     read_mapping += CSRs.sstatus -> (read_sstatus.asUInt)(xLen - 1, 0)
     read_mapping += CSRs.sip -> read_sip.asUInt
@@ -1832,4 +1862,74 @@ class CSRFile(
   def formFS(fs: UInt) = if (coreParams.haveFSDirty) fs else Fill(2, fs.orR)
 
   def formVS(vs: UInt) = if (usingVector) vs else 0.U
+
+  // For verification
+  if (coreParams.useVerif) {
+    val mepc = Wire(Vec(NRET, UInt(xLen.W)))
+    val mtval = Wire(Vec(NRET, UInt(xLen.W)))
+    val mtvec = Wire(Vec(NRET, UInt(xLen.W)))
+    val mcause = Wire(Vec(NRET, UInt(xLen.W)))
+    val mip = Wire(Vec(NRET, UInt(xLen.W)))
+    val mie = Wire(Vec(NRET, UInt(xLen.W)))
+    val mscratch = Wire(Vec(NRET, UInt(xLen.W)))
+    val mideleg = Wire(Vec(NRET, UInt(xLen.W)))
+    val medeleg = Wire(Vec(NRET, UInt(xLen.W)))
+    val minstret = Wire(Vec(NRET, UInt(xLen.W)))
+    val sepc = Wire(Vec(NRET, UInt(xLen.W)))
+    val stval = Wire(Vec(NRET, UInt(xLen.W)))
+    val stvec = Wire(Vec(NRET, UInt(xLen.W)))
+    val scause = Wire(Vec(NRET, UInt(xLen.W)))
+    val satp = Wire(Vec(NRET, UInt(xLen.W)))
+    val sscratch = Wire(Vec(NRET, UInt(xLen.W)))
+    val vtype = Wire(Vec(NRET, UInt(xLen.W)))
+    val vcsr = Wire(Vec(NRET, UInt(xLen.W)))
+    val vl = Wire(Vec(NRET, UInt(xLen.W)))
+    val vstart = Wire(Vec(NRET, UInt(xLen.W)))
+
+    for (i <- 0 until NRET) {
+      mepc(i) := readEPC(reg_mepc).sextTo(xLen)
+      mtval(i) := reg_mtval.sextTo(xLen)
+      mtvec(i) := read_mtvec
+      mcause(i) := reg_mcause
+      mip(i) := read_mip
+      mie(i) := reg_mie
+      mscratch(i) := reg_mscratch
+      mideleg(i) := read_mideleg
+      medeleg(i) := reg_medeleg
+      minstret(i) := reg_instret
+      sepc(i) := readEPC(reg_sepc)
+      stval(i) := reg_stval.sextTo(xLen)
+      stvec(i) := read_stvec
+      scause(i) := reg_scause
+      satp(i) := reg_satp.asUInt
+      sscratch(i) := reg_sscratch
+      vtype(i) := reg_vconfig.get.vtype.asUInt
+      vcsr(i) := read_vcsr
+      vl(i) := reg_vconfig.get.vl
+      vstart(i) := reg_vstart.get
+    }
+
+    io.mepc.get := mepc.asUInt
+    io.mepc.get := mepc.asUInt
+    io.mtval.get := mtval.asUInt
+    io.mtvec.get := mtvec.asUInt
+    io.mcause.get := mcause.asUInt
+    io.mip.get := mip.asUInt
+    io.mie.get := mie.asUInt
+    io.mscratch.get := mscratch.asUInt
+    io.mideleg.get := mideleg.asUInt
+    io.medeleg.get := medeleg.asUInt
+    io.minstret.get := minstret.asUInt
+    io.sepc.get := sepc.asUInt
+    io.stval.get := stval.asUInt
+    io.stvec.get := stvec.asUInt
+    io.scause.get := scause.asUInt
+    io.satp.get := satp.asUInt
+    io.sscratch.get := sscratch.asUInt
+    io.vtype.get := vtype.asUInt
+    io.vcsr.get := vcsr.asUInt
+    io.vl.get := vl.asUInt
+    io.vstart.get := vstart.asUInt
+  }
+
 }

@@ -1397,6 +1397,30 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ver_module = Module(new UvmVerification)
     if (gpcParams.useVerif) {
       ver_module.io.uvm_in := DontCare
+
+      ver_module.io.uvm_in.csr.mstatus := Cat(csr.io.status.asUInt(xLen-1, 0), csr.io.status.asUInt(xLen-1, 0))
+      ver_module.io.uvm_in.csr.mepc := csr.io.mepc.get
+      ver_module.io.uvm_in.csr.mtval := csr.io.mtval.get
+      ver_module.io.uvm_in.csr.mtvec := csr.io.mtvec.get
+      ver_module.io.uvm_in.csr.mcause := csr.io.mcause.get
+      ver_module.io.uvm_in.csr.mip := csr.io.mip.get
+      ver_module.io.uvm_in.csr.mie := csr.io.mie.get
+      ver_module.io.uvm_in.csr.mscratch := csr.io.mscratch.get
+      ver_module.io.uvm_in.csr.mideleg := csr.io.mideleg.get
+      ver_module.io.uvm_in.csr.medeleg := csr.io.medeleg.get
+      ver_module.io.uvm_in.csr.minstret := csr.io.minstret.get
+      ver_module.io.uvm_in.csr.sstatus := csr.io.sstatus.get.asUInt
+      ver_module.io.uvm_in.csr.sepc := csr.io.sepc.get
+      ver_module.io.uvm_in.csr.stval := csr.io.stval.get
+      ver_module.io.uvm_in.csr.stvec := csr.io.stvec.get
+      ver_module.io.uvm_in.csr.scause := csr.io.scause.get
+      ver_module.io.uvm_in.csr.satp := csr.io.satp.get
+      ver_module.io.uvm_in.csr.sscratch := csr.io.sscratch.get
+      ver_module.io.uvm_in.csr.vtype := csr.io.vtype.get
+      ver_module.io.uvm_in.csr.vcsr := csr.io.vcsr.get
+      ver_module.io.uvm_in.csr.vl := csr.io.vl.get
+      ver_module.io.uvm_in.csr.vstart := csr.io.vstart.get
+
       ver_module.io.uvm_in.swap := wb_reg_swap
       for (i <- 0 until 2) {
         ver_module.io.uvm_in.rob_enq(i).valid := wb_reg_valids(i)

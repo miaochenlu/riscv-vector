@@ -9,28 +9,28 @@ import VectorParam._
 import utility._
 
 class VerCSR(implicit p: Parameters) extends CoreBundle()(p) {
-  val  mstatusWr= UInt((NRET*xLen).W)
-  val  mepcWr= UInt((NRET*xLen).W)
-  val  mtvalWr= UInt((NRET*xLen).W)
-  val  mtvecWr= UInt((NRET*xLen).W)
-  val  mcauseWr= UInt((NRET*xLen).W)
-  val  mipWr= UInt((NRET*xLen).W)
-  val  mieWr= UInt((NRET*xLen).W)
-  val  mscratchWr= UInt((NRET*xLen).W)
-  val  midelegWr= UInt((NRET*xLen).W)
-  val  medelegWr= UInt((NRET*xLen).W)
-  val  minstretWr= UInt((NRET*xLen).W)
-  val  sstatusWr= UInt((NRET*xLen).W)
-  val  sepcWr= UInt((NRET*xLen).W)
-  val  stvalWr= UInt((NRET*xLen).W)
-  val  stvecWr= UInt((NRET*xLen).W)
-  val  scauseWr= UInt((NRET*xLen).W)
-  val  satpWr= UInt((NRET*xLen).W)
-  val  sscratchWr= UInt((NRET*xLen).W)
-  val  vtypeWr= UInt((NRET*xLen).W)
-  val  vcsrWr= UInt((NRET*xLen).W)
-  val  vlWr= UInt((NRET*xLen).W)
-  val  vstartWr= UInt((NRET*xLen).W)
+  val  mstatus= UInt((NRET*xLen).W)
+  val  mepc= UInt((NRET*xLen).W)
+  val  mtval= UInt((NRET*xLen).W)
+  val  mtvec= UInt((NRET*xLen).W)
+  val  mcause= UInt((NRET*xLen).W)
+  val  mip= UInt((NRET*xLen).W)
+  val  mie= UInt((NRET*xLen).W)
+  val  mscratch= UInt((NRET*xLen).W)
+  val  mideleg= UInt((NRET*xLen).W)
+  val  medeleg= UInt((NRET*xLen).W)
+  val  minstret= UInt((NRET*xLen).W)
+  val  sstatus= UInt((NRET*xLen).W)
+  val  sepc= UInt((NRET*xLen).W)
+  val  stval= UInt((NRET*xLen).W)
+  val  stvec= UInt((NRET*xLen).W)
+  val  scause= UInt((NRET*xLen).W)
+  val  satp= UInt((NRET*xLen).W)
+  val  sscratch= UInt((NRET*xLen).W)
+  val  vtype= UInt((NRET*xLen).W)
+  val  vcsr= UInt((NRET*xLen).W)
+  val  vl= UInt((NRET*xLen).W)
+  val  vstart= UInt((NRET*xLen).W)
 }
 
 class VerOutIO(implicit p: Parameters) extends CoreBundle()(p) {
@@ -73,6 +73,7 @@ class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val swap = Input(Bool())
   val rob_enq = Input(Vec(NRET, ValidIO(new ROBEnq)))
   val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
+  val csr = Input(new VerCSR)
   //TODO - add other signals such as csr and vector wb
 }
 
@@ -187,5 +188,6 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
   io.uvm_out.commit_currPc := Cat(commit_bits.map(_.pc).reverse)
   io.uvm_out.commit_insn := Cat(commit_bits.map(_.insn).reverse)
   io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
+  io.uvm_out.csr := io.uvm_in.csr
 
 }
