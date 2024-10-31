@@ -372,6 +372,13 @@ object VType {
     when(!vill || ignore_vill.B) {
       res := in
       res.vsew := in.vsew(log2Ceil(1 + in.max_vsew) - 1, 0)
+    }.otherwise{
+      //res := 0.U
+      res.vma := 0.U
+      res.vta := 0.U
+      res.vsew := 0.U
+      res.vlmul_sign := 0.U
+      res.vlmul_mag := 0.U
     }
     res.reserved := 0.U
     res.vill := vill
@@ -434,6 +441,8 @@ class CSRFile(
   reset_mstatus.mpp := PRV.M.U
   reset_mstatus.prv := PRV.M.U
   reset_mstatus.xs := (if (usingRoCC) 3.U else 0.U)
+  reset_mstatus.vs := (if(coreParams.useVector) 3.U else 0.U)
+  reset_mstatus.fs := 3.U
   val reg_mstatus = RegInit(reset_mstatus)
 
   val new_prv = WireDefault(reg_mstatus.prv)
