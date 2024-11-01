@@ -9,43 +9,43 @@ import VectorParam._
 import utility._
 
 class VerCSR(implicit p: Parameters) extends CoreBundle()(p) {
-  val  mstatus= UInt((NRET*xLen).W)
-  val  mepc= UInt((NRET*xLen).W)
-  val  mtval= UInt((NRET*xLen).W)
-  val  mtvec= UInt((NRET*xLen).W)
-  val  mcause= UInt((NRET*xLen).W)
-  val  mip= UInt((NRET*xLen).W)
-  val  mie= UInt((NRET*xLen).W)
-  val  mscratch= UInt((NRET*xLen).W)
-  val  mideleg= UInt((NRET*xLen).W)
-  val  medeleg= UInt((NRET*xLen).W)
-  val  minstret= UInt((NRET*xLen).W)
-  val  sstatus= UInt((NRET*xLen).W)
-  val  sepc= UInt((NRET*xLen).W)
-  val  stval= UInt((NRET*xLen).W)
-  val  stvec= UInt((NRET*xLen).W)
-  val  scause= UInt((NRET*xLen).W)
-  val  satp= UInt((NRET*xLen).W)
-  val  sscratch= UInt((NRET*xLen).W)
-  val  vtype= UInt((NRET*xLen).W)
-  val  vcsr= UInt((NRET*xLen).W)
-  val  vl= UInt((NRET*xLen).W)
-  val  vstart= UInt((NRET*xLen).W)
+  val mstatus = UInt((NRET * xLen).W)
+  val mepc = UInt((NRET * xLen).W)
+  val mtval = UInt((NRET * xLen).W)
+  val mtvec = UInt((NRET * xLen).W)
+  val mcause = UInt((NRET * xLen).W)
+  val mip = UInt((NRET * xLen).W)
+  val mie = UInt((NRET * xLen).W)
+  val mscratch = UInt((NRET * xLen).W)
+  val mideleg = UInt((NRET * xLen).W)
+  val medeleg = UInt((NRET * xLen).W)
+  val minstret = UInt((NRET * xLen).W)
+  val sstatus = UInt((NRET * xLen).W)
+  val sepc = UInt((NRET * xLen).W)
+  val stval = UInt((NRET * xLen).W)
+  val stvec = UInt((NRET * xLen).W)
+  val scause = UInt((NRET * xLen).W)
+  val satp = UInt((NRET * xLen).W)
+  val sscratch = UInt((NRET * xLen).W)
+  val vtype = UInt((NRET * xLen).W)
+  val vcsr = UInt((NRET * xLen).W)
+  val vl = UInt((NRET * xLen).W)
+  val vstart = UInt((NRET * xLen).W)
 }
 
 class VerOutIO(implicit p: Parameters) extends CoreBundle()(p) {
   val commit_valid = Output(UInt(NRET.W))
-  val commit_currPc = Output(UInt((NRET*xLen).W))
-  val commit_insn = Output(UInt((NRET*32).W))
+  val commit_currPc = Output(UInt((NRET * xLen).W))
+  val commit_insn = Output(UInt((NRET * 32).W))
 
   val sim_halt = Output(Bool())
 
   val trap_valid = Output(Bool())
   val trap_code = Output(UInt((xLen).W))
 
-  val reg_gpr= Output(UInt((NRET*31*xLen).W))
-  val reg_fpr= Output(UInt((NRET*32*fLen).W))
-  val reg_vpr= Output(UInt((NRET*32*vLen).W))
+  val reg_gpr = Output(UInt((NRET * 31 * xLen).W))
+  val reg_fpr = Output(UInt((NRET * 32 * fLen).W))
+  val reg_vpr = Output(UInt((NRET * 32 * vLen).W))
 
   val csr = Output(new VerCSR)
 }
@@ -91,7 +91,7 @@ class ROBEntry(implicit p: Parameters) extends CoreBundle()(p) {
   //TODO - add csr and vector wdata
 }
 
-class UvmVerification(implicit p:Parameters) extends CoreModule{
+class UvmVerification(implicit p: Parameters) extends CoreModule {
   val io = IO(new Bundle {
     val uvm_in = new VerInIO
     val uvm_out = new VerOutIO
@@ -99,10 +99,12 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
 
   val ROBSize = 64
   val debugROB = Reg(Vec(ROBSize, new ROBEntry))
+
   class robPtr extends CircularQueuePtr[robPtr](ROBSize)
+
   val enqPtrROB = RegInit(0.U.asTypeOf(new robPtr))
   val deqPtrROB = RegInit(0.U.asTypeOf(new robPtr))
-  when (reset.asBool) {
+  when(reset.asBool) {
     debugROB.foreach(_.valid := false.B)
   }
 
@@ -114,7 +116,7 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
   rob_enq_swapped(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).bits, io.uvm_in.rob_enq(1).bits)
   rob_enq_swapped_valid(0) := Mux(swapEnq, io.uvm_in.rob_enq(1).valid, io.uvm_in.rob_enq(0).valid)
   rob_enq_swapped_valid(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).valid, io.uvm_in.rob_enq(1).valid)
-  when (rob_enq_swapped_valid(0)) {
+  when(rob_enq_swapped_valid(0)) {
     debugROB(enqPtrROB.value).valid := true.B
     debugROB(enqPtrROB.value).pc := rob_enq_swapped(0).pc
     debugROB(enqPtrROB.value).insn := rob_enq_swapped(0).insn
@@ -126,7 +128,7 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
     debugROB(enqPtrROB.value).wdata := rob_enq_swapped(0).wdata
     debugROB(enqPtrROB.value).ready_to_commit := true.B //FIXME - 
   }
-  when (rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
+  when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     debugROB((enqPtrROB + 1.U).value).valid := true.B
     debugROB((enqPtrROB + 1.U).value).pc := rob_enq_swapped(1).pc
     debugROB((enqPtrROB + 1.U).value).insn := rob_enq_swapped(1).insn
@@ -138,9 +140,9 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
     debugROB((enqPtrROB + 1.U).value).wdata := rob_enq_swapped(1).wdata
     debugROB((enqPtrROB + 1.U).value).ready_to_commit := true.B //FIXME - 
   }
-  when (rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
+  when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     enqPtrROB := enqPtrROB + 2.U
-  }.elsewhen (rob_enq_swapped_valid(0)) {
+  }.elsewhen(rob_enq_swapped_valid(0)) {
     enqPtrROB := enqPtrROB + 1.U
   }
 
@@ -151,12 +153,12 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
   val commit_valids = Wire(Vec(2, Bool()))
   commit_valids(0) := debugROB(deqPtrROB.value).valid && debugROB(deqPtrROB.value).ready_to_commit
   commit_valids(1) := commit_valids(0) &&
-                      debugROB((deqPtrROB + 1.U).value).valid && debugROB((deqPtrROB + 1.U).value).ready_to_commit
-  when (commit_valids(0) && commit_valids(1)) {
+    debugROB((deqPtrROB + 1.U).value).valid && debugROB((deqPtrROB + 1.U).value).ready_to_commit
+  when(commit_valids(0) && commit_valids(1)) {
     deqPtrROB := deqPtrROB + 2.U
     debugROB(deqPtrROB.value).valid := false.B
     debugROB((deqPtrROB + 1.U).value).valid := false.B
-  }.elsewhen (commit_valids(0)) {
+  }.elsewhen(commit_valids(0)) {
     deqPtrROB := deqPtrROB + 1.U
     debugROB(deqPtrROB.value).valid := false.B
   }
@@ -165,29 +167,33 @@ class UvmVerification(implicit p:Parameters) extends CoreModule{
   commit_bits(1) := debugROB((deqPtrROB + 1.U).value)
 
   /**
-    * Emulated Integer Register File
-    */
+   * Emulated Integer Register File
+   */
   val emul_int_RF = RegInit(VecInit(Seq.fill(32)(0.U(xLen.W))))
   val emul_int_RF_next = Wire(Vec(2, Vec(32, UInt(xLen.W))))
   emul_int_RF_next(0) := emul_int_RF
-  when (commit_valids(0)) {
+  when(commit_valids(0)) {
     emul_int_RF_next(0)(commit_bits(0).waddr) := commit_bits(0).wdata
   }
   emul_int_RF_next(1) := emul_int_RF_next(0)
-  when (commit_valids(1)) {
+  when(commit_valids(1)) {
     emul_int_RF_next(1)(commit_bits(1).waddr) := commit_bits(1).wdata
   }
   emul_int_RF := emul_int_RF_next(1)
 
   /**
-    * Final verification interface
-    */
+   * Final verification interface
+   */
   io.uvm_out := DontCare
-  
+
   io.uvm_out.commit_valid := commit_valids.asUInt
   io.uvm_out.commit_currPc := Cat(commit_bits.map(_.pc).reverse)
   io.uvm_out.commit_insn := Cat(commit_bits.map(_.insn).reverse)
   io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
   io.uvm_out.csr := io.uvm_in.csr
 
+  val minstret = Wire(Vec(NRET, UInt(xLen.W)))
+  minstret(0) := io.uvm_in.csr.minstret(63, 0) - commit_valids(1)
+  minstret(1) := io.uvm_in.csr.minstret(127, 64)
+  io.uvm_out.csr.minstret := minstret.asUInt
 }
