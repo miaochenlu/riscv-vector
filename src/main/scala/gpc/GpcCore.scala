@@ -1398,7 +1398,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     if (gpcParams.useVerif) {
       ver_module.io.uvm_in := DontCare
 
-      ver_module.io.uvm_in.csr.mstatus := Cat(csr.io.status.asUInt(xLen - 1, 0), csr.io.status.asUInt(xLen - 1, 0))
+      ver_module.io.uvm_in.csr.mstatus := RegNext(Cat(csr.io.status.asUInt(xLen - 1, 0), csr.io.status.asUInt(xLen - 1, 0)))
       ver_module.io.uvm_in.csr.mepc := csr.io.mepc.get
       ver_module.io.uvm_in.csr.mtval := csr.io.mtval.get
       ver_module.io.uvm_in.csr.mtvec := csr.io.mtvec.get
