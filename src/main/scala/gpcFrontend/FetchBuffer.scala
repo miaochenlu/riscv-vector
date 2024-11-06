@@ -43,8 +43,9 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     dontTouch(io.enq)
     dontTouch(io.deq)
     val fb = RegInit(VecInit.fill(numEntries)(0.U.asTypeOf(Valid(new FrontendResp))))
-    val cnt = RegInit(0.U(log2Up(numEntries).W))
-    io.mask := Mux(cnt === 0.U, 0.U, (1.U << cnt) - 1.U)
+    val validCount = fb.count(_.valid)
+
+    io.mask := Mux(validCount === 0.U, 0.U, (1.U << validCount) - 1.U)
 
    // def isFull: Bool = cnt === numEntries.U 
     
@@ -166,17 +167,6 @@ dontTouch(io.enq.fire)
     deq_ptr.ptr := 1.U
     deq_ptr.flag := false.B
     fb.foreach(_.valid := false.B)
-    cnt := 0.U
-  }.otherwise{
-     for (i <- 0 until retireWidth) {
-      when(io.enq.fire && io.deq(i).fire) {
-        cnt := cnt 
-      }.elsewhen(io.enq.fire){
-        cnt := cnt + 1.U
-      }.elsewhen(io.deq(i).fire){
-        cnt := cnt - 1.U
-      }
-    }
   }
   dontTouch(io.flush)
 }
