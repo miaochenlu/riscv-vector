@@ -151,9 +151,13 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
 
   // Commit of ROB
   val commit_valids = Wire(Vec(2, Bool()))
+  val commit_wxds = Wire(Vec(2, Bool()))
   commit_valids(0) := debugROB(deqPtrROB.value).valid && debugROB(deqPtrROB.value).ready_to_commit
   commit_valids(1) := commit_valids(0) &&
     debugROB((deqPtrROB + 1.U).value).valid && debugROB((deqPtrROB + 1.U).value).ready_to_commit
+  commit_wxds(0) := debugROB(deqPtrROB.value).int
+  commit_wxds(1) := debugROB((deqPtrROB + 1.U).value).int
+
   when(commit_valids(0) && commit_valids(1)) {
     deqPtrROB := deqPtrROB + 2.U
     debugROB(deqPtrROB.value).valid := false.B
@@ -172,11 +176,11 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   val emul_int_RF = RegInit(VecInit(Seq.fill(32)(0.U(xLen.W))))
   val emul_int_RF_next = Wire(Vec(2, Vec(32, UInt(xLen.W))))
   emul_int_RF_next(0) := emul_int_RF
-  when(commit_valids(0)) {
+  when(commit_valids(0) && commit_wxds(0)) {
     emul_int_RF_next(0)(commit_bits(0).waddr) := commit_bits(0).wdata
   }
   emul_int_RF_next(1) := emul_int_RF_next(0)
-  when(commit_valids(1)) {
+  when(commit_valids(1) && commit_wxds(1)) {
     emul_int_RF_next(1)(commit_bits(1).waddr) := commit_bits(1).wdata
   }
   emul_int_RF := emul_int_RF_next(1)
