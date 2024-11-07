@@ -38,6 +38,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     val deq = Vec(decodeWidth, Decoupled(new FrontendResp))
     //val peek = Vec(decodeWidth, Valid(new FrontendResp))
     val flush = Input(Bool())
+    val redirect_pc = Input(UInt())
     val mask = Output(UInt(numEntries.W))
     })
     dontTouch(io.enq)
@@ -141,9 +142,10 @@ dontTouch(io.enq.fire)
   for (i <- 0 until retireWidth) {
     val deq_data = Mux1H(ptr_de.ptr, fb)
     val next_pc =  Mux1H(rotateLeft(ptr_de).ptr, fb.map(_.bits.pc))
+    val Notyet_inq_npc = PriorityMux((0 until fetchWidth).map(i => enq_data(i).valid -> enq_data(i).bits.pc))
     io.deq(i).valid := deq_data.valid
     io.deq(i).bits := deq_data.bits
-    io.deq(i).bits.next_pc := next_pc
+    io.deq(i).bits.next_pc := Mux(next_pc =/= 0.U, next_pc, Mux(io.flush,io.redirect_pc,Notyet_inq_npc))
     deq_mask = Mux(io.deq(i).fire, deq_mask | ptr_de.ptr, deq_mask)
     ptr_de = rotateLeft(ptr_de)
   }
