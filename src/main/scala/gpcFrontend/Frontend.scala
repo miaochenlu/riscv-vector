@@ -243,6 +243,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
                                       (f2_kill_speculative_tlb_refill && f2_tlb_resp.miss)
   fb.io.flush := false.B
   io.cpu.resp <> fb.io.deq
+  fb.io.redirect_pc := io.cpu.req.bits.pc
 
   //redirect
   when (io.cpu.req.valid){
