@@ -816,7 +816,8 @@ object Instructions {
   def XPERM4             = BitPat("b0010100??????????010?????0110011")
   def XPERM8             = BitPat("b0010100??????????100?????0110011")
   def ZEXT_H             = BitPat("b000010000000?????100?????0111011")
-
+  // For verification
+  def ROCKET_EXIT        = BitPat("b00000000000000000000000001101011")
 }
 object Causes {
   val misaligned_fetch = 0x0

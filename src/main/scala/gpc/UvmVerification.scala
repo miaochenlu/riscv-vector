@@ -196,6 +196,14 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
   io.uvm_out.csr := io.uvm_in.csr
 
+  val pass = RegInit(false.B)
+  when((commit_valids(0) && commit_bits(0).insn === (0x6b.U(32.W))) ||
+    (commit_valids(1) && commit_bits(1).insn === (0x6b.U(32.W)))) {
+    pass := true.B
+  }
+
+  io.uvm_out.sim_halt := pass
+
   val minstret = Wire(Vec(NRET, UInt(xLen.W)))
   minstret(0) := io.uvm_in.csr.minstret(63, 0) - commit_valids(1)
   minstret(1) := io.uvm_in.csr.minstret(127, 64)
