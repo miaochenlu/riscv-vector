@@ -194,8 +194,9 @@ class SVHLsu(
   val accelStrideList     = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => 1.U << i)
   val accelLog2StrideList = Seq.tabulate(log2Up(maxAccelerateStride) + 1)(i => i.U)
   val accelStride         = Cat(accelStrideList.reverseMap(strideAbs === _))
-  val canAccel            = (accelStride =/= 0.U || zeroStride) && ~isAddrMisalign(strideAbs, enqLsCtrl.log2Memwb)
-  val log2Stride          = Mux(canAccel, Mux1H(accelStride, accelLog2StrideList), 0.U)
+  val canAccel =
+    (accelStride =/= 0.U || zeroStride) && ~isAddrMisalign(strideAbs, enqLsCtrl.log2Memwb) // NOTE: not segment
+  val log2Stride = Mux(canAccel, Mux1H(accelStride, accelLog2StrideList), 0.U)
 
   val curStrideAddr = Mux(
     curSplitIdx === 0.U && enqMuopInfo.uopIdx === 0.U,
@@ -253,12 +254,17 @@ class SVHLsu(
   val deqAddrInfo      = addrQueue.io.deq.bits
   val accessMeta       = metaQueue(deqAddrInfo.metaPtr)
   val addrMisalign     = isAddrMisalign(deqAddrInfo.addr, accessMeta.ldstCtrl.log2Memwb)
-  // val elemMaskVec      = VecInit(Seq.fill(vlenb)(false.B))
-  val isNotMasked = true.B
+  val elemMaskVec      = VecInit(Seq.fill(vlenb)(false.B))
+  val isNotMasked      = elemMaskVec.asUInt =/= 0.U
   val canEnqueue =
     (accessMeta.ldstCtrl.vm || isNotMasked) && (deqAddrInfo.curSplitIdx + deqAddrInfo.elemCnt >= splitStart)
   val canWriteback =
     (deqAddrInfo.curSplitIdx + deqAddrInfo.elemCnt >= splitCount) && accessMeta.muopInfo.destVRegEnd
+
+  val paddingMask      = VecInit(accessMeta.elementMask ++ VecInit(Seq.fill(vlenb)(false.B)))
+  elemMaskVec := (0 until vlenb).map(i =>
+    (i.U < issueUop.elemCnt) & paddingMask(i.U + issueUop.startElem)
+  )
 
   val ldstEnqEntry = WireInit(0.U.asTypeOf(new LdstUop))
   ldstEnqEntry.valid        := canEnqueue && addrQueue.io.deq.fire
@@ -272,7 +278,7 @@ class SVHLsu(
   ldstEnqEntry.writeback    := canWriteback
   ldstEnqEntry.metaPtr      := deqAddrInfo.metaPtr
 
-  when(addrQueue.io.deq.fire) {
+  when(addrQueue.io.deq.fire && canEnqueue) {
     ldstUopQueue(uopEnqPtr.value) := ldstEnqEntry
     uopEnqPtr                     := Mux(canEnqueue, uopEnqPtr + 1.U, uopEnqPtr)
   }
@@ -317,7 +323,6 @@ class SVHLsu(
     Mux1H(UIntToOH(deqLsCtrl.log2Memwb), Seq(16.U, 8.U, 4.U, 2.U)) -
       PriorityEncoder(Reverse(deqMeta.elementMask.asUInt)) - 1.U
 
-  // val stZeroStrideMask = Wire(UInt(dataBytes.W))
   val stZeroStrideMask = Mux(
     deqMeta.elementMask.asUInt === 0.U,
     0.U,
@@ -502,11 +507,11 @@ class SVHLsu(
   val misalignXcpt = WireInit(0.U.asTypeOf(new LdstXcpt))
   misalignXcpt.ma := deqUop.addrMisalign
 
-  deqMeta.hasXcpt := canDeque && deqUop.xcptValid
-
   when(canDeque && deqUop.xcptValid) {
     deqMeta.xcptVl   := deqUop.pos
     deqMeta.xcptAddr := deqUop.addr
+    deqMeta.hasXcpt  := true.B
+    hasXcpt          := true.B
 
     when(deqUop.addrMisalign) {
       deqMeta.xcpt := misalignXcpt
@@ -561,6 +566,8 @@ class SVHLsu(
     uopIssuePtr := 0.U.asTypeOf(new HLdstQueuePtr)
     uopDeqPtr   := 0.U.asTypeOf(new HLdstQueuePtr)
     uopEnqPtr   := 0.U.asTypeOf(new HLdstQueuePtr)
+
+    hasXcpt := false.B
   }.elsewhen(deqMeta.canCommit) {
     deqMeta    := 0.U.asTypeOf(new HLSUMeta)
     metaDeqPtr := metaDeqPtr + 1.U

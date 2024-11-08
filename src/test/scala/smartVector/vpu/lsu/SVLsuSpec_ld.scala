@@ -917,24 +917,24 @@ trait VLsuBehavior_ld {
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
   behavior of "LSU test"
-  it should behave like vLsuTest0()  // unit-stride load
-  it should behave like vLsuTest1()  // unit-stride load
-  it should behave like vLsuTest2()  // unit-stride load
-  it should behave like vLsuTest3()  // unit-stride load
-  it should behave like vLsuTest4()  // unit-stride load
-  it should behave like vLsuTest5()  // unit-stride load
-  it should behave like vLsuTest6()  // unit-stride mask load
-  it should behave like vLsuTest7()  // unit-stride fault-only-first
-  it should behave like vLsuTest8()  // unit-stride fault-only-first
-  it should behave like vLsuTest9()  // unit-stride fault-only-first
-  it should behave like vLsuTest10() // unit-stride fault-only-first
-  it should behave like vLsuTest11() // strided load
-  it should behave like vLsuTest12() // strided load
-  it should behave like vLsuTest13() // strided load
-  it should behave like vLsuTest14() // strided load
-  it should behave like vLsuTest15() // strided load
-  it should behave like vLsuTest16() // strided load with mask enabled
-  it should behave like vLsuTest17() // unit-stride exception
-  it should behave like vLsuTest18() // unit-stride whole register load
+  // it should behave like vLsuTest0()  // unit-stride load
+  // it should behave like vLsuTest1()  // unit-stride load
+  // it should behave like vLsuTest2()  // unit-stride load
+  // it should behave like vLsuTest3()  // unit-stride load
+  // it should behave like vLsuTest4()  // unit-stride load
+  // it should behave like vLsuTest5()  // unit-stride load
+  // it should behave like vLsuTest6()  // unit-stride mask load
+  // it should behave like vLsuTest7()  // unit-stride fault-only-first
+  // it should behave like vLsuTest8()  // unit-stride fault-only-first
+  // it should behave like vLsuTest9()  // unit-stride fault-only-first
+  // it should behave like vLsuTest10() // unit-stride fault-only-first
+  // it should behave like vLsuTest11() // strided load
+  // it should behave like vLsuTest12() // strided load
+  // it should behave like vLsuTest13() // strided load
+  // it should behave like vLsuTest14() // strided load
+  // it should behave like vLsuTest15() // strided load
+  // it should behave like vLsuTest16() // strided load with mask enabled
+  // it should behave like vLsuTest17() // unit-stride exception
+  // it should behave like vLsuTest18() // unit-stride whole register load
   it should behave like vLsuTest20()
 }

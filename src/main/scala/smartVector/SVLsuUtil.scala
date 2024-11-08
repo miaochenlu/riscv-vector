@@ -105,20 +105,19 @@ object LdstUopStatus {
 }
 
 class HLSUMeta extends Bundle {
-  val valid         = Bool()
-  val ldstCtrl      = new LSULdstCtrl
-  val muopInfo      = new mUopInfo
-  val vregDataVec   = Vec(vlenb, UInt(8.W))
-  val vregDataValid = Vec(vlenb, Bool())
-  val elementMask   = Vec(vlenb, Bool())
-  val zeroStride    = Bool()
-  val negStride     = Bool()
-  val log2Stride    = UInt(log2Ceil(dataWidth / 8).W)
-  val xcpt          = new LdstXcpt()
-  val xcptVl        = UInt(bVL.W)
-  val xcptAddr      = UInt(addrWidth.W)
-  val hasXcpt       = Bool()
-  val canCommit     = Bool()
+  val valid       = Bool()
+  val ldstCtrl    = new LSULdstCtrl
+  val muopInfo    = new mUopInfo
+  val vregDataVec = Vec(vlenb, UInt(8.W))
+  val elementMask = Vec(vlenb, Bool())
+  val zeroStride  = Bool()
+  val negStride   = Bool()
+  val log2Stride  = UInt(log2Ceil(dataWidth / 8).W)
+  val xcpt        = new LdstXcpt()
+  val xcptVl      = UInt(bVL.W)
+  val xcptAddr    = UInt(addrWidth.W)
+  val hasXcpt     = Bool()
+  val canCommit   = Bool()
 }
 
 class CommitInfoRecorded extends Bundle {
