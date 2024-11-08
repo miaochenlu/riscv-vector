@@ -27,7 +27,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   
   val io = IO(new Bundle {
     val in = Input(ValidIO(new Muop))
+    val in_mergeInfo = Input(ValidIO(new MuopMergeAttr)) // pipe mergeInfo
     val out = ValidIO(new IexOutput)
+    val out_mergeInfo = ValidIO(new MuopMergeAttr)
     val permOut = new(VPermOutput)
     val permRegIn = Input(new(VPermRegIn))
     val iexNeedStall = Output(Bool())
@@ -51,10 +53,12 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   
   //val mUopValid = io.in.valid && ~(io.in.bits.uop.ctrl.isLdst && io.excpInfo.illegalInst) && ~mUop.excpInfo.exception_vld
   val muxData = WireInit(0.U.asTypeOf(new Muop))
+  val muxmergeInfo = WireInit(0.U.asTypeOf(new MuopMergeAttr))
   val muxValid = Wire(new Bool())
   
 
   val bufferReg = RegInit(0.U.asTypeOf(new Muop))
+  val bufferRegmergeInfo = RegInit(0.U.asTypeOf(new MuopMergeAttr))
   val bufferValidReg = RegInit(false.B)
   
   val inSameType = Wire(Bool())
@@ -63,20 +67,20 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   val bufferAccept = Wire(Bool())
   val currentModuleReg = RegInit(0.U(3.W))
 
-  inSameType := //(io.in.bits.uop.ctrl.alu  || io.in.bits.uop.ctrl.mask) && currentModuleReg === 1.U ||
+  inSameType := (io.in.bits.uop.ctrl.alu  || io.in.bits.uop.ctrl.mask) && currentModuleReg === 1.U ||
                 //(io.in.bits.uop.ctrl.mul  || io.in.bits.uop.ctrl.redu) && currentModuleReg === 2.U ||
                 // io.in.bits.uop.ctrl.div  && currentModuleReg === 3.U  && SVDiv.io.in.ready ||
                  io.in.bits.uop.ctrl.fp   && currentModuleReg === 4.U  && SVFpu.io.in.ready //||
                 // io.in.bits.uop.ctrl.perm && currentModuleReg === 5.U  && ~SVPerm.io.out.perm_busy
 
-  bufferSameType := //(bufferReg.uop.ctrl.alu  || bufferReg.uop.ctrl.mask) && currentModuleReg === 1.U ||
+  bufferSameType := (bufferReg.uop.ctrl.alu  || bufferReg.uop.ctrl.mask) && currentModuleReg === 1.U ||
                     //(bufferReg.uop.ctrl.mul  || bufferReg.uop.ctrl.redu) && currentModuleReg === 2.U ||
                     // bufferReg.uop.ctrl.div  && currentModuleReg === 3.U && SVDiv.io.in.ready ||
                      bufferReg.uop.ctrl.fp   && currentModuleReg === 4.U && SVFpu.io.in.ready //||
                     // bufferReg.uop.ctrl.perm && currentModuleReg === 5.U && ~SVPerm.io.out.perm_busy
 
-  bufferAccept := bufferSameType && currentState === ongoing || currentState === empty
-  inAccept := inSameType && currentState === ongoing || currentState === empty
+  bufferAccept := (bufferSameType && currentState === ongoing) || currentState === empty
+  inAccept := (inSameType && currentState === ongoing) || currentState === empty
 
 
  
@@ -89,14 +93,14 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   }.otherwise{
     muxValid := false.B
   }  
-
+  
   when(~bufferValidReg && io.in.valid && ~inAccept){
     bufferValidReg := true.B
     bufferReg := io.in.bits
   }
 
   when(bufferValidReg && bufferAccept){
-    bufferValidReg := true.B
+    bufferValidReg := false.B
   }
 
   val mUop = muxData
@@ -130,7 +134,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
       }
     }
     is(ongoing){
-      when(outValid || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
+      // lhy
+      //when(outValid || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && ~(mUop.uop.uopIdx === 0.U))){
+      when(outValid || (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready && mUop.uop.uopEnd)){
           currentStateNext := empty
       }.otherwise{
           currentStateNext := ongoing
@@ -141,7 +147,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   currentState := currentStateNext
   
   //io.iexNeedStall := (currentState === ongoing)
-  io.iexNeedStall := !bufferValidReg
+  io.iexNeedStall := bufferValidReg
 
   SValu.io.in.valid   := mUopValid && mUop.uop.ctrl.alu
   SVMac.io.in.valid   := mUopValid && mUop.uop.ctrl.mul
@@ -170,8 +176,9 @@ class VIexWrapper(implicit p : Parameters) extends Module {
     currentModuleReg := 4.U
   }.elsewhen(SVPerm.io.in.rvalid){
     currentModuleReg := 5.U
-  }.otherwise{
-    currentModuleReg := 0.U
+  // lhy
+  //}.otherwise{
+  //  currentModuleReg := 0.U
   }
 
   SVPerm.io.in.uop := mUop.uop
@@ -226,6 +233,18 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   io.excpInfo := io.in.bits.excpInfo
   io.excpInfo.exception_vld := mUop.excpInfo.exception_vld && muxValid
   io.excpInfo.illegalInst := mUop.excpInfo.illegalInst && muxValid
+
+  // lhy: pipe merge info
+  val queue_merge_info = Module(new Queue(new MuopMergeAttr, 8))
+  queue_merge_info.io.enq.valid := io.in.valid && (!bufferValidReg) && io.in_mergeInfo.valid&& ~io.in.bits.excpInfo.exception_vld &&
+    (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.fp ||
+      io.in.bits.uop.ctrl.perm || io.in.bits.uop.ctrl.mask || io.in.bits.uop.ctrl.redu) &&
+    ~((mUop.uop.ctrl.narrow_to_1 || mUop.uop.ctrl.redu || vcpop_m) && ~mUop.uop.uopEnd)
+  queue_merge_info.io.enq.bits := io.in_mergeInfo.bits
+  queue_merge_info.io.deq.ready := outValid || (!queue_merge_info.io.deq.valid) ||
+      (mUop.uop.ctrl.floatRed && SVFpu.io.in.ready)
+  io.out_mergeInfo.bits := queue_merge_info.io.deq.bits
+  io.out_mergeInfo.valid := queue_merge_info.io.deq.valid
 }
 
 

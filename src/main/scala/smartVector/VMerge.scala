@@ -34,17 +34,29 @@ class VMerge (implicit p : Parameters) extends Module {
     val fflagsBuffer   = RegInit(0.U(5.W))
     val fflagsBufferIn = Wire(UInt(5.W))
   
-    val rfWriteEn         = RegEnable(io.in.mergeInfo.bits.rfWriteEn,        io.in.mergeInfo.valid)
-    val rfWriteIdx        = RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
-    val regBackWidth      = RegEnable(io.in.mergeInfo.bits.regBackWidth,     io.in.mergeInfo.valid)
-    val regWriteMuopIdx   = RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx,  io.in.mergeInfo.valid)
-    val scalarRegWriteEn  = RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
-    val floatRegWriteEn   = RegEnable(io.in.mergeInfo.bits.floatRegWriteEn,  io.in.mergeInfo.valid)
-    val scalarRegWriteIdx = RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
-    val muopEnd           = RegEnable(io.in.mergeInfo.bits.muopEnd,          io.in.mergeInfo.valid)
-    val permExpdLen       = RegEnable(io.in.mergeInfo.bits.permExpdLen,      io.in.mergeInfo.valid)
-    val regDstIdx         = RegEnable(io.in.mergeInfo.bits.regDstIdx,        io.in.mergeInfo.valid)
+ //   val rfWriteEn         = RegEnable(io.in.mergeInfo.bits.rfWriteEn,        io.in.mergeInfo.valid)
+ //   val rfWriteIdx        = RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
+ //   val regBackWidth      = RegEnable(io.in.mergeInfo.bits.regBackWidth,     io.in.mergeInfo.valid)
+ //   val regWriteMuopIdx   = RegEnable(io.in.mergeInfo.bits.regWriteMuopIdx,  io.in.mergeInfo.valid)
+ //   val scalarRegWriteEn  = RegEnable(io.in.mergeInfo.bits.scalarRegWriteEn, io.in.mergeInfo.valid)
+ //   val floatRegWriteEn   = RegEnable(io.in.mergeInfo.bits.floatRegWriteEn,  io.in.mergeInfo.valid)
+ //   val scalarRegWriteIdx = RegEnable(io.in.mergeInfo.bits.ldest,            io.in.mergeInfo.valid)
+ //   val muopEnd           = RegEnable(io.in.mergeInfo.bits.muopEnd,          io.in.mergeInfo.valid)
+ //   val permExpdLen       = RegEnable(io.in.mergeInfo.bits.permExpdLen,      io.in.mergeInfo.valid)
+ //   val regDstIdx         = RegEnable(io.in.mergeInfo.bits.regDstIdx,        io.in.mergeInfo.valid)
          
+  
+    val rfWriteEn         = io.in.mergeInfo.bits.rfWriteEn        
+    val rfWriteIdx        = io.in.mergeInfo.bits.ldest            
+    val regBackWidth      = io.in.mergeInfo.bits.regBackWidth     
+    val regWriteMuopIdx   = io.in.mergeInfo.bits.regWriteMuopIdx  
+    val scalarRegWriteEn  = io.in.mergeInfo.bits.scalarRegWriteEn 
+    val floatRegWriteEn   = io.in.mergeInfo.bits.floatRegWriteEn  
+    val scalarRegWriteIdx = io.in.mergeInfo.bits.ldest            
+    val muopEnd           = io.in.mergeInfo.bits.muopEnd          
+    val permExpdLen       = io.in.mergeInfo.bits.permExpdLen      
+    val regDstIdx         = io.in.mergeInfo.bits.regDstIdx        
+
     when(io.in.aluIn.valid && rfWriteEn){
         when(regBackWidth === "b111".U){
             io.out.toRegFileWrite.rfWriteEn   := true.B
