@@ -822,7 +822,7 @@ class CSRFile(
     read_sstatus.sie := io.status.sie
 
     // For verification
-    val sstatus = Wire(Vec(NRET, UInt(xLen.W)))
+    val sstatus = Reg(Vec(NRET, UInt(xLen.W)))
 
     for (i <- 0 until NRET) {
       sstatus(i) := (read_sstatus.asUInt)(xLen - 1, 0)
