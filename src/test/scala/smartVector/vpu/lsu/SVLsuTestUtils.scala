@@ -333,6 +333,8 @@ class SmartVectorLsuTestWrapper(isLoad: Boolean) extends Module {
     vLsu.io.mUopMergeAttr.bits.regDstIdx        := 0.U
     vLsu.io.mUopMergeAttr.bits.regCount         := 1.U
 
+    vLsu.io.mUop.bits.excpInfo := DontCare
+
     io.lsuOut.valid                             := vLsu.io.lsuOut.valid
     io.lsuOut.bits.data                         := vLsu.io.lsuOut.bits.data
     io.lsuOut.bits.rfWriteEn                    := vLsu.io.lsuOut.bits.rfWriteEn

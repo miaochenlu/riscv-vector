@@ -37,8 +37,10 @@ trait SmartVectorBehavior_ld {
     // BitPat("b???001???????????000?????0000111")
     // vluexi8 v8, 0(x1), vs4
     def VLUXEI8_V   = "b000_001_1_00100_00001_000_01000_0000111"
-
     def VLUXEI16_V  = "b000_001_1_00100_00001_101_01000_0000111"
+
+    // vle16ff.v v8, 0(x1), vm
+    def VLE16FF_V   = "b000_000_0_10000_00001_101_01000_0000111"
 
   
     def vLsuTest0(): Unit = {
