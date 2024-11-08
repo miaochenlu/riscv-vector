@@ -742,6 +742,40 @@ trait VLsuBehavior_ld {
         }
         }
     }
+
+    
+    def vLsuTest21(): Unit = {
+        it should "pass: unit-stride fault-only-first with mask (uops=1, eew=16, vl=4, vstart=0)" in {
+        test(new SmartVectorLsuTestWrapper(true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+            dut.clock.step(1)
+            val ldReqs = Seq(
+                (vle16ff.copy(vm=false, vl=8, uopIdx=0, uopEnd=true, vstart=0), SrcBundleLd(scalar_opnd_1="h1055", mask="hffff_ffff_ffff_ffff_ffff_ffff_ffff_ff30"), "h201f1e1d1c1b1a191817161514131211".U, "hffff".U),
+            )
+
+            for ((c, s, r, m) <- ldReqs) {
+                while (!dut.io.lsuReady.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.mUop.valid.poke(true.B)
+                dut.io.mUop.bits.poke(genLdInput(c, s))
+                dut.clock.step(1)
+                dut.io.mUop.valid.poke(false.B)
+
+                while (!dut.io.lsuOut.valid.peekBoolean()) {
+                    dut.clock.step(1)
+                }
+                dut.io.lsuOut.valid.expect(true.B)
+                dut.io.xcpt.exception_vld.expect(false.B)
+                dut.io.xcpt.update_vl.expect(true.B)
+                dut.io.xcpt.update_data.expect(4.U)
+                dut.io.lsuOut.bits.data.expect(r)
+                dut.io.lsuOut.bits.rfWriteMask.expect(m)
+                dut.clock.step(4)
+            }
+        }
+        }
+    }
+
 }
 
 class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenHelper with VLsuBehavior_ld {
@@ -766,4 +800,5 @@ class VLsuSpec_ld extends AnyFlatSpec with ChiselScalatestTester with BundleGenH
     it should behave like vLsuTest17()  // unit-stride exception
     it should behave like vLsuTest18()  // unit-stride whole register load
     it should behave like vLsuTest20()
+    it should behave like vLsuTest21()
 }
