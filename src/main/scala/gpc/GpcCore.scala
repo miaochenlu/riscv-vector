@@ -207,6 +207,14 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     val id_swap = Wire(Bool())
 
+    val int_fp_ldst_sel = RegInit(false.B)
+    val ex_int_dmem_req = Wire(Bool())
+    val ex_fp_dmem_req = Wire(Bool())
+    val m1_int_dmem_req = Reg(Bool())
+    val m1_fp_dmem_req = Reg(Bool())
+    val m2_int_dmem_req = Reg(Bool())
+    val m2_fp_dmem_req = Reg(Bool())
+
     val ex_reg_uops = RegInit(VecInit.fill(decodeWidthGpc)(0.U.asTypeOf(new SUOp)))
     val ex_reg_valids = RegInit(VecInit(Seq.fill(decodeWidthGpc)(false.B)))
     val ex_reg_swap = RegNext(id_swap)
@@ -323,6 +331,15 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (io.fpu.dec.ren2, id_uops(1).rs2),
       (io.fpu.dec.ren3, id_uops(1).rs3),
       (io.fpu.dec.wen, id_uops(1).rd))
+
+    // int/fp dmem request ping-pong arbiter
+    val id_int_dmem_req = id_ctrls(0).mem
+    val id_fp_dmem_req = id_ctrls(1).mem
+
+    when(id_int_dmem_req && id_fp_dmem_req) {
+      int_fp_ldst_sel := !int_fp_ldst_sel
+    }
+
     /** Check RAW/WAW data hazard for:
      * ID <--> EX */
     val ex_ctrls = ex_reg_uops.map(_.ctrl)
@@ -739,6 +756,14 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
           m1_reg_store := ex_reg_uops(0).ctrl.mem && isWrite(ex_reg_uops(0).ctrl.mem_cmd)
         }
       }
+
+      when(!ctrl_killx(0)) {
+        m1_int_dmem_req := ex_int_dmem_req
+      }
+      when(!ctrl_killx(1)) {
+        m1_fp_dmem_req := ex_fp_dmem_req
+      }
+
       when(!ctrl_killx(i)) {
         m1_reg_rsdata(i) := {
           if (i == 0) ex_p0_rs else ex_p1_rs
@@ -879,6 +904,14 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
           m2_reg_wphit := m1_reg_wphit | bpu.io.bpwatch.map { bpw => (bpw.rvalid(0) && m1_reg_load) || (bpw.wvalid(0) && m1_reg_store) }
         }
       }
+
+      when(!ctrl_killm1(0)) {
+        m2_int_dmem_req := m1_int_dmem_req
+      }
+      when(!ctrl_killm1(1)) {
+        m2_fp_dmem_req := m1_fp_dmem_req
+      }
+
       when(!ctrl_killm1(i)) {
         m2_reg_rsdata(i) := {
           if (i == 0) m1_p0_rs else m1_p1_rs
@@ -1214,7 +1247,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       csr.io.csr_stall ||
       id_reg_pause ||
       vsb_almost_full && id_uops(0).vec ||
-      vsb_stall_id
+      vsb_stall_id ||
+      (id_int_dmem_req && id_fp_dmem_req && int_fp_ldst_sel)
     id_stall(1) := id_ex_hazard_uop1 || id_m1_hazard_uop1 || id_m2_hazard_uop1 || id_busytable_hazard_uop1 ||
       stall_singleStep ||
       id_csr_en && csr.io.decode(0).fp_csr && !io.fpu.fcsr_rdy ||
@@ -1222,7 +1256,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       id_ctrls(1).div && (!(div.io.req.ready || (div.io.resp.valid && !m2_wxd_p1)) || div.io.req.valid) || // reduce odds of replay
       !clock_en ||
       csr.io.csr_stall ||
-      id_reg_pause
+      id_reg_pause ||
+      (id_int_dmem_req && id_fp_dmem_req && !int_fp_ldst_sel)
 
     /** WB stage
      */
@@ -1326,15 +1361,18 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.fpu.vfp_wb.bits.wdata := io.vcomplete.wdata
     io.fpu.vfp_wb.bits.waddr := io.vcomplete.wdata_reg_idx
 
-    io.dmem.req.valid := ex_reg_valids(0) && ex_reg_uops(0).ctrl.mem
-    val ex_dcache_tag = Cat(ex_reg_uops(0).rd, ex_reg_uops(0).ctrl.fp)
+    ex_int_dmem_req := ex_reg_valids(0) && ex_reg_uops(0).ctrl.mem
+    ex_fp_dmem_req := ex_reg_valids(1) && ex_reg_uops(1).ctrl.mem
+    io.dmem.req.valid := (ex_reg_valids(0) && ex_reg_uops(0).ctrl.mem) || (ex_reg_valids(1) && ex_reg_uops(1).ctrl.mem)
+    val ex_dcache_tag = Mux(ex_int_dmem_req, Cat(ex_reg_uops(0).rd, ex_reg_uops(0).ctrl.fp), Cat(ex_reg_uops(1).rd, ex_reg_uops(1).ctrl.fp))
     require(coreParams.dcacheReqTagBits >= ex_dcache_tag.getWidth)
     io.dmem.req.bits.tag := ex_dcache_tag
-    io.dmem.req.bits.cmd := ex_reg_uops(0).ctrl.mem_cmd
+    io.dmem.req.bits.cmd := Mux(ex_int_dmem_req, ex_reg_uops(0).ctrl.mem_cmd, ex_reg_uops(0).ctrl.mem_cmd)
     io.dmem.req.bits.size := ex_reg_mem_size
-    io.dmem.req.bits.signed := ex_reg_uops(0).inst(14)
+    io.dmem.req.bits.signed := Mux(ex_int_dmem_req, ex_reg_uops(0).inst(14), ex_reg_uops(0).inst(14))
     io.dmem.req.bits.phys := false.B
-    io.dmem.req.bits.addr := encodeVirtualAddress(ex_p1_rs(0), alu_p0.io.adder_out)
+    io.dmem.req.bits.addr := Mux(ex_int_dmem_req, encodeVirtualAddress(ex_p0_rs(0), alu_p0.io.adder_out),
+      encodeVirtualAddress(ex_p1_rs(0), alu_p1.io.adder_out))
     io.dmem.req.bits.idx.foreach(_ := io.dmem.req.bits.addr)
     io.dmem.req.bits.dprv := csr.io.status.dprv
     io.dmem.req.bits.dv := csr.io.status.dv
@@ -1343,11 +1381,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.dmem.req.bits.data := DontCare
     io.dmem.req.bits.mask := DontCare
 
-    io.dmem.asid := m2_reg_rsdata(0)(1)
-    io.dmem.s1_data.data := (if (fLen == 0) m1_reg_rsdata(0)(1) else Mux(m1_reg_uops(0).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(0)(1)))
+    io.dmem.asid := Mux(m2_int_dmem_req, m2_reg_rsdata(0)(1), m2_reg_rsdata(1)(1))
+    io.dmem.s1_data.data := Mux(m1_int_dmem_req, (if (fLen == 0) m1_reg_rsdata(0)(1) else Mux(m1_reg_uops(0).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(0)(1))),
+      (if (fLen == 0) m1_reg_rsdata(1)(1) else Mux(m1_reg_uops(1).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(1)(1))))
     io.dmem.s1_data.mask := DontCare
 
-    io.dmem.s1_kill := ctrl_killm1(0) //REVIEW
+    io.dmem.s1_kill := Mux(m1_int_dmem_req, ctrl_killm1(0), ctrl_killm1(1)) //REVIEW
     io.dmem.s2_kill := false.B
     // don't let D$ go to sleep if we're probably going to use it soon
     io.dmem.keep_clock_enabled := true.B //REVIEW
