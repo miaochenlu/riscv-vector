@@ -80,10 +80,8 @@ class ProbeQueue(
   io.probeCheck.probePermission := probeReq.param
 
   // orgranize probe req sent to pipeline
-  io.mainPipeReq.bits := MainPipeReqConverter(probeReq, edge.bundle)
-  io.mainPipeReq.valid :=
-    (state === s_pipe_req) &&
-      (!io.lrscAddr.valid || io.lrscAddr.bits =/= getLineAddr(probeReq.address))
+  io.mainPipeReq.bits  := MainPipeReqConverter(probeReq, edge.bundle)
+  io.mainPipeReq.valid := (state === s_pipe_req)
 
   // organize probe req sent to wb
   io.wbReq.valid          := (state === s_wb_req)
@@ -94,7 +92,9 @@ class ProbeQueue(
   io.wbReq.bits.data      := DontCare // FIXME
   io.wbReq.bits.hasData   := false.B
 
-  io.memProbe.ready := (state === s_invalid)
+  io.memProbe.ready := (state === s_invalid) &&
+    (!io.lrscAddr.valid ||
+      io.lrscAddr.bits =/= getLineAddr(io.memProbe.bits.address))
 
   assert(io.memProbe.bits.opcode === TLMessages.Probe || ~io.memProbe.valid)
 }
