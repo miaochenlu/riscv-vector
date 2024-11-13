@@ -110,7 +110,7 @@ class VIllegalInstrn extends Module {
   val viota    = ctrl.mask && ctrl.funct6 === "b010100".U && ctrl.lsrc(0) === "b10000".U
 
   val mask_onlyOneReg = ctrl.mask && !(ctrl.funct6(3, 2) === "b01".U && ctrl.lsrc(0)(4))
-  val alu_mask = ctrl.alu && (ctrl.funct6(5,4) === "b11".U || ctrl.funct6 === "b010001".U || ctrl.funct6 === "b010011".U)
+  val alu_mask = ctrl.alu && (ctrl.funct6(4,3) === "b11".U || ctrl.funct6 === "b010001".U || ctrl.funct6 === "b010011".U)
   
   val convertToInt = vfncvt_xu_f || vfncvt_x_f || vfncvt_rtz_xu_f || vfncvt_rtz_x_f // || vfncvt_f_xu || vfncvt_f_x
 
@@ -184,11 +184,14 @@ class VIllegalInstrn extends Module {
   //                ctrl.funct6(5, 3) === "b011".U ||  //compare
   //                ctrl.funct6(5, 2) === "b0100".U && ctrl.funct6(0) && ctrl.opi) //vmadc/vmsbc
 
+  // lhy
+  val ill_vmsbf_vd_vm_overlap = vd === 0.U && !ctrl.vm && ctrl.mask && ctrl.funct6 === "b010100".U && (vs1 === "b00001".U || vs1 === "b00011".U || vs1 === "b00010".U)
+
   val illFinal = ill_vsew || ill_vlmul || ill_widenNarrow || ill_vstart || ill_gatherE16 ||
                ill_ldstEmul || ill_seg || ill_seg_past31 || ill_nfield ||
                ill_ext || ill_nreg || ill_frm || ill_sewFP ||
                ill_reg || ill_regGrpEnd || ill_regOverlap || ill_segOverlap ||
-               ill_vd_vs2 //|| ill_vd_v0
+               ill_vd_vs2 || ill_vmsbf_vd_vm_overlap //|| ill_vd_v0
   io.ill.valid := RegNext(illFinal || io.ctrl.illegal || io.csr.vill) && RegNext(io.validIn)
   io.ill.bits := RegNext(io.robPtrIn)
 }
