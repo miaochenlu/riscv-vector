@@ -336,27 +336,27 @@ class CSRFileIO(hasBeu: Boolean)(implicit p: Parameters) extends CoreBundle
     val set_vxsat = Input(Bool())
   })
 
-  val mepc = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mtval = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mtvec = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mcause = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mip = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mie = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mscratch = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val mideleg = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val medeleg = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val minstret = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val sstatus = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val sepc = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val stval = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val stvec = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val scause = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val satp = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val sscratch = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val vtype = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val vcsr = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val vl = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
-  val vstart = coreParams.useVerif.option(Output(UInt((NRET * xLen).W)))
+  val mepc = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mtval = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mtvec = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mcause = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mip = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mie = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mscratch = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val mideleg = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val medeleg = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val minstret = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val sstatus = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val sepc = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val stval = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val stvec = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val scause = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val satp = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val sscratch = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val vtype = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val vcsr = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val vl = coreParams.useVerif.option(Output(UInt((xLen).W)))
+  val vstart = coreParams.useVerif.option(Output(UInt((xLen).W)))
 }
 
 class VConfig(implicit p: Parameters) extends CoreBundle {
@@ -372,7 +372,7 @@ object VType {
     when(!vill || ignore_vill.B) {
       res := in
       res.vsew := in.vsew(log2Ceil(1 + in.max_vsew) - 1, 0)
-    }.otherwise{
+    }.otherwise {
       //res := 0.U
       res.vma := 0.U
       res.vta := 0.U
@@ -441,7 +441,7 @@ class CSRFile(
   reset_mstatus.mpp := PRV.M.U
   reset_mstatus.prv := PRV.M.U
   reset_mstatus.xs := (if (usingRoCC) 3.U else 0.U)
-  reset_mstatus.vs := (if(coreParams.useVector) 3.U else 0.U)
+  reset_mstatus.vs := (if (coreParams.useVector) 3.U else 0.U)
   reset_mstatus.fs := 3.U
   val reg_mstatus = RegInit(reset_mstatus)
 
@@ -822,11 +822,9 @@ class CSRFile(
     read_sstatus.sie := io.status.sie
 
     // For verification
-    val sstatus = Reg(Vec(NRET, UInt(xLen.W)))
+    val sstatus = Reg(UInt(xLen.W))
 
-    for (i <- 0 until NRET) {
-      sstatus(i) := (read_sstatus.asUInt)(xLen - 1, 0)
-    }
+    sstatus := (read_sstatus.asUInt)(xLen - 1, 0)
     io.sstatus.get := sstatus.asUInt
 
     read_mapping += CSRs.sstatus -> (read_sstatus.asUInt)(xLen - 1, 0)
@@ -1874,71 +1872,69 @@ class CSRFile(
 
   // For verification
   if (coreParams.useVerif) {
-    val mepc = Reg(Vec(NRET, UInt(xLen.W)))
-    val mtval = Reg(Vec(NRET, UInt(xLen.W)))
-    val mtvec = Reg(Vec(NRET, UInt(xLen.W)))
-    val mcause = Reg(Vec(NRET, UInt(xLen.W)))
-    val mip = Reg(Vec(NRET, UInt(xLen.W)))
-    val mie = Reg(Vec(NRET, UInt(xLen.W)))
-    val mscratch = Reg(Vec(NRET, UInt(xLen.W)))
-    val mideleg = Reg(Vec(NRET, UInt(xLen.W)))
-    val medeleg = Reg(Vec(NRET, UInt(xLen.W)))
-    val minstret = Reg(Vec(NRET, UInt(xLen.W)))
-    val sepc = Reg(Vec(NRET, UInt(xLen.W)))
-    val stval = Reg(Vec(NRET, UInt(xLen.W)))
-    val stvec = Reg(Vec(NRET, UInt(xLen.W)))
-    val scause = Reg(Vec(NRET, UInt(xLen.W)))
-    val satp = Reg(Vec(NRET, UInt(xLen.W)))
-    val sscratch = Reg(Vec(NRET, UInt(xLen.W)))
-    val vtype = Reg(Vec(NRET, UInt(xLen.W)))
-    val vcsr = Reg(Vec(NRET, UInt(xLen.W)))
-    val vl = Reg(Vec(NRET, UInt(xLen.W)))
-    val vstart = Reg(Vec(NRET, UInt(xLen.W)))
+    val mepc = Reg(UInt(xLen.W))
+    val mtval = Reg(UInt(xLen.W))
+    val mtvec = Reg(UInt(xLen.W))
+    val mcause = Reg(UInt(xLen.W))
+    val mip = Reg(UInt(xLen.W))
+    val mie = Reg(UInt(xLen.W))
+    val mscratch = Reg(UInt(xLen.W))
+    val mideleg = Reg(UInt(xLen.W))
+    val medeleg = Reg(UInt(xLen.W))
+    val minstret = Reg(UInt(xLen.W))
+    val sepc = Reg(UInt(xLen.W))
+    val stval = Reg(UInt(xLen.W))
+    val stvec = Reg(UInt(xLen.W))
+    val scause = Reg(UInt(xLen.W))
+    val satp = Reg(UInt(xLen.W))
+    val sscratch = Reg(UInt(xLen.W))
+    val vtype = Reg(UInt(xLen.W))
+    val vcsr = Reg(UInt(xLen.W))
+    val vl = Reg(UInt(xLen.W))
+    val vstart = Reg(UInt(xLen.W))
 
-    for (i <- 0 until NRET) {
-      mepc(i) := readEPC(reg_mepc).sextTo(xLen)
-      mtval(i) := reg_mtval.sextTo(xLen)
-      mtvec(i) := read_mtvec
-      mcause(i) := reg_mcause
-      mip(i) := read_mip
-      mie(i) := reg_mie
-      mscratch(i) := reg_mscratch
-      mideleg(i) := read_mideleg
-      medeleg(i) := reg_medeleg
-      minstret(i) := reg_instret
-      sepc(i) := readEPC(reg_sepc)
-      stval(i) := reg_stval.sextTo(xLen)
-      stvec(i) := read_stvec
-      scause(i) := reg_scause
-      satp(i) := reg_satp.asUInt
-      sscratch(i) := reg_sscratch
-      vtype(i) := reg_vconfig.get.vtype.asUInt
-      vcsr(i) := read_vcsr
-      vl(i) := reg_vconfig.get.vl
-      vstart(i) := reg_vstart.get
-    }
+    mepc := readEPC(reg_mepc).sextTo(xLen)
+    mtval := reg_mtval.sextTo(xLen)
+    mtvec := read_mtvec
+    mcause := reg_mcause
+    mip := read_mip
+    mie := reg_mie
+    mscratch := reg_mscratch
+    mideleg := read_mideleg
+    medeleg := reg_medeleg
+    minstret := reg_instret
+    sepc := readEPC(reg_sepc)
+    stval := reg_stval.sextTo(xLen)
+    stvec := read_stvec
+    scause := reg_scause
+    satp := reg_satp.asUInt
+    sscratch := reg_sscratch
+    vtype := reg_vconfig.get.vtype.asUInt
+    vcsr := read_vcsr
+    vl := reg_vconfig.get.vl
+    vstart := reg_vstart.get
 
-    io.mepc.get := mepc.asUInt
-    io.mepc.get := mepc.asUInt
-    io.mtval.get := mtval.asUInt
-    io.mtvec.get := mtvec.asUInt
-    io.mcause.get := mcause.asUInt
-    io.mip.get := mip.asUInt
-    io.mie.get := mie.asUInt
-    io.mscratch.get := mscratch.asUInt
-    io.mideleg.get := mideleg.asUInt
-    io.medeleg.get := medeleg.asUInt
-    io.minstret.get := minstret.asUInt
-    io.sepc.get := sepc.asUInt
-    io.stval.get := stval.asUInt
-    io.stvec.get := stvec.asUInt
-    io.scause.get := scause.asUInt
-    io.satp.get := satp.asUInt
-    io.sscratch.get := sscratch.asUInt
-    io.vtype.get := vtype.asUInt
-    io.vcsr.get := vcsr.asUInt
-    io.vl.get := vl.asUInt
-    io.vstart.get := vstart.asUInt
+    io.mepc.get := mepc
+    io.mepc.get := mepc
+    io.mtval.get := mtval
+    io.mtvec.get := mtvec
+    io.mcause.get := mcause
+    io.mip.get := mip
+    io.mie.get := mie
+    io.mscratch.get := mscratch
+    io.mideleg.get := mideleg
+    io.medeleg.get := medeleg
+    io.minstret.get := minstret
+    io.sepc.get := sepc
+    io.stval.get := stval
+    io.stvec.get := stvec
+    io.scause.get := scause
+    io.satp.get := satp
+    io.sscratch.get := sscratch
+    io.vtype.get := vtype
+    io.vcsr.get := vcsr
+    io.vl.get := vl
+    io.vstart.get := vstart
   }
 
 }
