@@ -8,7 +8,32 @@ import freechips.rocketchip.tile._
 import VectorParam._
 import utility._
 
-class VerCSR(implicit p: Parameters) extends CoreBundle()(p) {
+class VerInCSR(implicit p: Parameters) extends CoreBundle()(p) {
+  val mstatus = UInt((xLen).W)
+  val mepc = UInt((xLen).W)
+  val mtval = UInt((xLen).W)
+  val mtvec = UInt((xLen).W)
+  val mcause = UInt((xLen).W)
+  val mip = UInt((xLen).W)
+  val mie = UInt((xLen).W)
+  val mscratch = UInt((xLen).W)
+  val mideleg = UInt((xLen).W)
+  val medeleg = UInt((xLen).W)
+  val minstret = UInt((xLen).W)
+  val sstatus = UInt((xLen).W)
+  val sepc = UInt((xLen).W)
+  val stval = UInt((xLen).W)
+  val stvec = UInt((xLen).W)
+  val scause = UInt((xLen).W)
+  val satp = UInt((xLen).W)
+  val sscratch = UInt((xLen).W)
+  val vtype = UInt((xLen).W)
+  val vcsr = UInt((xLen).W)
+  val vl = UInt((xLen).W)
+  val vstart = UInt((xLen).W)
+}
+
+class VerOutCSR(implicit p: Parameters) extends CoreBundle()(p) {
   val mstatus = UInt((NRET * xLen).W)
   val mepc = UInt((NRET * xLen).W)
   val mtval = UInt((NRET * xLen).W)
@@ -47,7 +72,7 @@ class VerOutIO(implicit p: Parameters) extends CoreBundle()(p) {
   val reg_fpr = Output(UInt((NRET * 32 * fLen).W))
   val reg_vpr = Output(UInt((NRET * 32 * vLen).W))
 
-  val csr = Output(new VerCSR)
+  val csr = Output(new VerOutCSR)
 }
 
 class ROBEnq(implicit p: Parameters) extends CoreBundle()(p) {
@@ -73,7 +98,7 @@ class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val swap = Input(Bool())
   val rob_enq = Input(Vec(NRET, ValidIO(new ROBEnq)))
   val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
-  val csr = Input(new VerCSR)
+  val csr = Input(new VerInCSR)
   //TODO - add other signals such as csr and vector wb
 }
 
@@ -213,7 +238,34 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   io.uvm_out.commit_insn := Cat(commit_bits.map(_.insn).reverse)
   io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
   io.uvm_out.reg_fpr := Cat(emul_int_FRF_next.map(frf => Cat(frf.tail.reverse)).reverse)
-  io.uvm_out.csr := io.uvm_in.csr
+
+  val old_csr = RegEnable(io.uvm_in.csr, commit_valids.reduce(_ || _))
+  val csr_swap = RegEnable(io.uvm_in.swap, commit_valids.reduce(_ || _))
+
+  io.uvm_out.csr.mstatus      := Mux(csr_swap, Cat(io.uvm_in.csr.mstatus , old_csr.mstatus ), Cat(io.uvm_in.csr.mstatus ,io.uvm_in.csr.mstatus ))
+  io.uvm_out.csr.mepc         := Mux(csr_swap, Cat(io.uvm_in.csr.mepc    , old_csr.mepc    ), Cat(io.uvm_in.csr.mepc    ,io.uvm_in.csr.mepc    ))
+  io.uvm_out.csr.mtval        := Mux(csr_swap, Cat(io.uvm_in.csr.mtval   , old_csr.mtval   ), Cat(io.uvm_in.csr.mtval   ,io.uvm_in.csr.mtval   ))
+  io.uvm_out.csr.mtvec        := Mux(csr_swap, Cat(io.uvm_in.csr.mtvec   , old_csr.mtvec   ), Cat(io.uvm_in.csr.mtvec   ,io.uvm_in.csr.mtvec   ))
+  io.uvm_out.csr.mcause       := Mux(csr_swap, Cat(io.uvm_in.csr.mcause  , old_csr.mcause  ), Cat(io.uvm_in.csr.mcause  ,io.uvm_in.csr.mcause  ))
+  io.uvm_out.csr.mip          := Mux(csr_swap, Cat(io.uvm_in.csr.mip     , old_csr.mip     ), Cat(io.uvm_in.csr.mip     ,io.uvm_in.csr.mip     ))
+  io.uvm_out.csr.mie          := Mux(csr_swap, Cat(io.uvm_in.csr.mie     , old_csr.mie     ), Cat(io.uvm_in.csr.mie     ,io.uvm_in.csr.mie     ))
+  io.uvm_out.csr.mscratch     := Mux(csr_swap, Cat(io.uvm_in.csr.mscratch, old_csr.mscratch), Cat(io.uvm_in.csr.mscratch,io.uvm_in.csr.mscratch))
+  io.uvm_out.csr.mideleg      := Mux(csr_swap, Cat(io.uvm_in.csr.mideleg , old_csr.mideleg ), Cat(io.uvm_in.csr.mideleg ,io.uvm_in.csr.mideleg ))
+  io.uvm_out.csr.medeleg      := Mux(csr_swap, Cat(io.uvm_in.csr.medeleg , old_csr.medeleg ), Cat(io.uvm_in.csr.medeleg ,io.uvm_in.csr.medeleg ))
+  io.uvm_out.csr.sstatus      := Mux(csr_swap, Cat(io.uvm_in.csr.sstatus , old_csr.sstatus ), Cat(io.uvm_in.csr.sstatus ,io.uvm_in.csr.sstatus ))
+  io.uvm_out.csr.sepc         := Mux(csr_swap, Cat(io.uvm_in.csr.sepc    , old_csr.sepc    ), Cat(io.uvm_in.csr.sepc    ,io.uvm_in.csr.sepc    ))
+  io.uvm_out.csr.stval        := Mux(csr_swap, Cat(io.uvm_in.csr.stval   , old_csr.stval   ), Cat(io.uvm_in.csr.stval   ,io.uvm_in.csr.stval   ))
+  io.uvm_out.csr.stvec        := Mux(csr_swap, Cat(io.uvm_in.csr.stvec   , old_csr.stvec   ), Cat(io.uvm_in.csr.stvec   ,io.uvm_in.csr.stvec   ))
+  io.uvm_out.csr.scause       := Mux(csr_swap, Cat(io.uvm_in.csr.scause  , old_csr.scause  ), Cat(io.uvm_in.csr.scause  ,io.uvm_in.csr.scause  ))
+  io.uvm_out.csr.satp         := Mux(csr_swap, Cat(io.uvm_in.csr.satp    , old_csr.satp    ), Cat(io.uvm_in.csr.satp    ,io.uvm_in.csr.satp    ))
+  io.uvm_out.csr.sscratch     := Mux(csr_swap, Cat(io.uvm_in.csr.sscratch, old_csr.sscratch), Cat(io.uvm_in.csr.sscratch,io.uvm_in.csr.sscratch))
+  io.uvm_out.csr.vtype        := Mux(csr_swap, Cat(io.uvm_in.csr.vtype   , old_csr.vtype   ), Cat(io.uvm_in.csr.vtype   ,io.uvm_in.csr.vtype   ))
+  io.uvm_out.csr.vcsr         := Mux(csr_swap, Cat(io.uvm_in.csr.vcsr    , old_csr.vcsr    ), Cat(io.uvm_in.csr.vcsr    ,io.uvm_in.csr.vcsr    ))
+  io.uvm_out.csr.vl           := Mux(csr_swap, Cat(io.uvm_in.csr.vl      , old_csr.vl      ), Cat(io.uvm_in.csr.vl      ,io.uvm_in.csr.vl      ))
+  io.uvm_out.csr.vstart       := Mux(csr_swap, Cat(io.uvm_in.csr.vstart  , old_csr.vstart  ), Cat(io.uvm_in.csr.vstart  ,io.uvm_in.csr.vstart  ))
+
+
+  io.uvm_out.csr.minstret := Cat(io.uvm_in.csr.minstret, io.uvm_in.csr.minstret - commit_valids(1))
 
   val pass = RegInit(false.B)
   when((commit_valids(0) && commit_bits(0).insn === (0x6b.U(32.W))) ||
@@ -222,9 +274,4 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   }
 
   io.uvm_out.sim_halt := pass
-
-  val minstret = Wire(Vec(NRET, UInt(xLen.W)))
-  minstret(0) := io.uvm_in.csr.minstret(63, 0) - commit_valids(1)
-  minstret(1) := io.uvm_in.csr.minstret(127, 64)
-  io.uvm_out.csr.minstret := minstret.asUInt
 }
