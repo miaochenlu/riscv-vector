@@ -40,16 +40,18 @@ class MSHR(id: Int) extends Module() {
   val probeState = Mux(
     state > mode_resp_wait,
     ProbeMSHRState.hitBlockB,
-    MuxLookup(io.probePermission, ProbeMSHRState.hitGo)(
-      Seq(
-        TLPermissions.toN -> ProbeMSHRState.hitBlockN,
-        TLPermissions.toB -> Mux(
-          sentPermission === TLPermissions.NtoB,
-          ProbeMSHRState.hitGo,
-          ProbeMSHRState.hitBlockN,
-        ),
-      )
-    ),
+    ProbeMSHRState.hitBlockN,
+//    MuxLookup(io.probePermission, ProbeMSHRState.hitGo)(
+//      Seq(
+//        TLPermissions.toT -> ProbeMSHRState.hitBlockN,
+//        TLPermissions.toN -> ProbeMSHRState.hitBlockN,
+//        TLPermissions.toB -> Mux(
+//          sentPermission === TLPermissions.NtoB,
+//          ProbeMSHRState.hitGo,
+//          ProbeMSHRState.hitBlockN,
+//        ),
+//      )
+//    ),
   )
 
   io.probeState := Mux(probeReq && io.probeLineAddrMatch, probeState, ProbeMSHRState.miss)
