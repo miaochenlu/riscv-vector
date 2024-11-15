@@ -235,7 +235,7 @@ class VIexWrapper(implicit p : Parameters) extends Module {
   io.excpInfo.illegalInst := mUop.excpInfo.illegalInst && muxValid
 
   // lhy: pipe merge info
-  val queue_merge_info = Module(new Queue(new MuopMergeAttr, 8))
+  val queue_merge_info = Module(new Queue(new MuopMergeAttr, 16))
   queue_merge_info.io.enq.valid := io.in.valid && (!bufferValidReg) && io.in_mergeInfo.valid&& ~io.in.bits.excpInfo.exception_vld &&
     (io.in.bits.uop.ctrl.alu || io.in.bits.uop.ctrl.mul || io.in.bits.uop.ctrl.div || io.in.bits.uop.ctrl.fp ||
       io.in.bits.uop.ctrl.perm || io.in.bits.uop.ctrl.mask || io.in.bits.uop.ctrl.redu) &&
