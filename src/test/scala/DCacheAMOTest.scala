@@ -25,7 +25,7 @@ trait DCacheAMOTestTrait {
         DCacheInit.initDut(dut)
 
         val cacheReq = CacheReqBundle(
-          paddr = "h80004000",
+          paddr = "h80004008",
           size = 3,
         )
 
@@ -38,7 +38,7 @@ trait DCacheAMOTestTrait {
         dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XRD)))
 
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h2323232323232323".U)
+        dut.io.resp.bits.data.expect("h1010101010101010".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
         dut.clock.step(1)

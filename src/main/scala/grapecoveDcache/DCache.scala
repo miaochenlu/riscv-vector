@@ -332,7 +332,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   val s2_amoStoreData = (s2_amoStoreDataVec.asUInt & s2_mask) | s2_data & ~s2_mask
 
-  amoalu.io.mask := new StoreGen(s2_req.size, s2_req.paddr, 0.U, XLEN).mask // XLEN mask
+  amoalu.io.mask := new StoreGen(s2_req.size, s2_req.paddr, 0.U, XLEN / 8).mask // XLEN mask
   amoalu.io.cmd  := s2_req.cmd
   amoalu.io.lhs  := s2_dataVec(s2_bankOffset)
   amoalu.io.rhs  := s2_req.wdata
