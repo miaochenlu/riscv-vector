@@ -48,7 +48,9 @@ class MSHRWrapper(
 
   val amoReq = isAMO(io.req.bits.cmd)
   dontTouch(amoReq)
-  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) && !mshrs.io.addrMatch // && !muteLr
+  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) &&
+    !mshrs.io.addrMatch &&
+    !iomshrs.io.addrMatch
   val validMSHRReq = Mux(
     amoReq || !io.cacheable || iomshrs.io.addrMatch,
     false.B,
