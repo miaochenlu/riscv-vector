@@ -20,3 +20,4 @@ rocketchip.jar
 compile.log
 metals
 .bsp/
+src/main/scala/gpcdcache/*
