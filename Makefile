@@ -13,5 +13,8 @@ MILL ?= mill
 verilog:
 	cd $(base_dir) && $(MILL) emulator[gpc.system.TestHarness,$(CONFIG)].mfccompiler.compile
 
+dcache_init:
+	cp dependencies/gpc_cache/src/main/scala/grapecoveDcache/* src/main/scala/gpcdcache/
+
 clean:
-	rm -rf out/
+	rm src/main/scala/gpcdcache/* && rm -rf out/

@@ -7,3 +7,10 @@
 [submodule "dependencies/chisel"]
 	path = dependencies/chisel
 	url = https://github.com/chipsalliance/chisel.git
+[submodule "dependencies/dependencies/gpc_cache"]
+	path = dependencies/dependencies/gpc_cache
+	url = https://github.com/IntelLabs/riscv-vector/
+[submodule "dependencies/gpc_cache"]
+	path = dependencies/gpc_cache
+	url = https://github.com/IntelLabs/riscv-vector/
+	branch = gpc_cache
