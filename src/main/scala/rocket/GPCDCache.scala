@@ -115,6 +115,7 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
   dontTouch(s2_cacheResp)
   io.cpu.resp.bits := DontCare
   io.cpu.resp.valid := s2_cacheRespValid && (s2_cacheResp.status =/= CacheRespStatus.miss && s2_cacheResp.status =/= CacheRespStatus.replay)
+  io.cpu.resp.bits.size := s2_cacheResp.size
   io.cpu.resp.bits.has_data := s2_cacheResp.hasData
   io.cpu.resp.bits.data := s2_cacheResp.data
   io.cpu.resp.bits.data_word_bypass := s2_cacheResp.data // FIXME loadgen.word
