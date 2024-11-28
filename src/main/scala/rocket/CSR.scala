@@ -822,7 +822,7 @@ class CSRFile(
     read_sstatus.sie := io.status.sie
 
     // For verification
-    val sstatus = Reg(UInt(xLen.W))
+    val sstatus = Wire(UInt(xLen.W))
 
     sstatus := (read_sstatus.asUInt)(xLen - 1, 0)
     io.sstatus.get := sstatus.asUInt
@@ -1872,26 +1872,26 @@ class CSRFile(
 
   // For verification
   if (coreParams.useVerif) {
-    val mepc = Reg(UInt(xLen.W))
-    val mtval = Reg(UInt(xLen.W))
-    val mtvec = Reg(UInt(xLen.W))
-    val mcause = Reg(UInt(xLen.W))
-    val mip = Reg(UInt(xLen.W))
-    val mie = Reg(UInt(xLen.W))
-    val mscratch = Reg(UInt(xLen.W))
-    val mideleg = Reg(UInt(xLen.W))
-    val medeleg = Reg(UInt(xLen.W))
-    val minstret = Reg(UInt(xLen.W))
-    val sepc = Reg(UInt(xLen.W))
-    val stval = Reg(UInt(xLen.W))
-    val stvec = Reg(UInt(xLen.W))
-    val scause = Reg(UInt(xLen.W))
-    val satp = Reg(UInt(xLen.W))
-    val sscratch = Reg(UInt(xLen.W))
-    val vtype = Reg(UInt(xLen.W))
-    val vcsr = Reg(UInt(xLen.W))
-    val vl = Reg(UInt(xLen.W))
-    val vstart = Reg(UInt(xLen.W))
+    val mepc = Wire(UInt(xLen.W))
+    val mtval = Wire(UInt(xLen.W))
+    val mtvec = Wire(UInt(xLen.W))
+    val mcause = Wire(UInt(xLen.W))
+    val mip = Wire(UInt(xLen.W))
+    val mie = Wire(UInt(xLen.W))
+    val mscratch = Wire(UInt(xLen.W))
+    val mideleg = Wire(UInt(xLen.W))
+    val medeleg = Wire(UInt(xLen.W))
+    val minstret = Wire(UInt(xLen.W))
+    val sepc = Wire(UInt(xLen.W))
+    val stval = Wire(UInt(xLen.W))
+    val stvec = Wire(UInt(xLen.W))
+    val scause = Wire(UInt(xLen.W))
+    val satp = Wire(UInt(xLen.W))
+    val sscratch = Wire(UInt(xLen.W))
+    val vtype = Wire(UInt(xLen.W))
+    val vcsr = Wire(UInt(xLen.W))
+    val vl = Wire(UInt(xLen.W))
+    val vstart = Wire(UInt(xLen.W))
 
     mepc := readEPC(reg_mepc).sextTo(xLen)
     mtval := reg_mtval.sextTo(xLen)

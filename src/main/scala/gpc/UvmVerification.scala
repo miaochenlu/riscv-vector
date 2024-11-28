@@ -84,7 +84,7 @@ class ROBEnq(implicit p: Parameters) extends CoreBundle()(p) {
   val vsb_id = UInt(bVScoreboardId.W)
   val waddr = UInt(5.W)
   val wdata = UInt(xLen.W) // int/fp, wdata of enq is not available for long-latency instrn
-  //TODO - add csr
+  val ll_ind = Bool() // Long latency indication
 }
 
 class ROBWb(implicit p: Parameters) extends CoreBundle()(p) {
@@ -97,8 +97,12 @@ class ROBWb(implicit p: Parameters) extends CoreBundle()(p) {
 class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val swap = Input(Bool())
   val rob_enq = Input(Vec(NRET, ValidIO(new ROBEnq)))
-  val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
+  //  val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
   val csr = Input(new VerInCSR)
+  val ll_int_wr = Input(Bool()) // Long latency int back: int load miss for pipe0 and int div for pipe1
+  val ll_fp_wr = Input(Bool()) // Long latency fp pipe1 back: fp load miss, fp div/sqrt to be added
+  val ll_waddr = Input(UInt(5.W))
+  val ll_wdata = Input(UInt(xLen.W)) // int/fp, wdata of enq is not available for long-latency instrn
   //TODO - add other signals such as csr and vector wb
 }
 
@@ -112,6 +116,7 @@ class ROBEntry(implicit p: Parameters) extends CoreBundle()(p) {
   val vsb_id = UInt(bVScoreboardId.W)
   val waddr = UInt(5.W)
   val wdata = UInt(xLen.W) // int/fp, wdata of enq is not available for long-latency instrn
+  val csr = (new VerInCSR())
   val ready_to_commit = Bool()
   //TODO - add csr and vector wdata
 }
@@ -137,10 +142,16 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   val swapEnq = io.uvm_in.swap
   val rob_enq_swapped = Wire(Vec(2, new ROBEnq))
   val rob_enq_swapped_valid = Wire(Vec(2, Bool()))
+  val csr_swapped = Wire(Vec(2, new(VerInCSR)))
+  val old_csr = RegEnable(io.uvm_in.csr, rob_enq_swapped_valid.reduce(_ || _))
   rob_enq_swapped(0) := Mux(swapEnq, io.uvm_in.rob_enq(1).bits, io.uvm_in.rob_enq(0).bits)
   rob_enq_swapped(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).bits, io.uvm_in.rob_enq(1).bits)
   rob_enq_swapped_valid(0) := Mux(swapEnq, io.uvm_in.rob_enq(1).valid, io.uvm_in.rob_enq(0).valid)
   rob_enq_swapped_valid(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).valid, io.uvm_in.rob_enq(1).valid)
+  csr_swapped(0) := Mux(swapEnq, old_csr, io.uvm_in.csr)
+  csr_swapped(0).minstret := io.uvm_in.csr.minstret - rob_enq_swapped_valid(1)
+  csr_swapped(1) := io.uvm_in.csr
+
   when(rob_enq_swapped_valid(0)) {
     debugROB(enqPtrROB.value).valid := true.B
     debugROB(enqPtrROB.value).pc := rob_enq_swapped(0).pc
@@ -151,7 +162,8 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     debugROB(enqPtrROB.value).vsb_id := rob_enq_swapped(0).vsb_id
     debugROB(enqPtrROB.value).waddr := rob_enq_swapped(0).waddr
     debugROB(enqPtrROB.value).wdata := rob_enq_swapped(0).wdata
-    debugROB(enqPtrROB.value).ready_to_commit := true.B //FIXME - 
+    debugROB(enqPtrROB.value).csr := csr_swapped(0)
+    debugROB(enqPtrROB.value).ready_to_commit := rob_enq_swapped_valid(0) && !rob_enq_swapped(0).ll_ind
   }
   when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     debugROB((enqPtrROB + 1.U).value).valid := true.B
@@ -163,7 +175,8 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     debugROB((enqPtrROB + 1.U).value).vsb_id := rob_enq_swapped(1).vsb_id
     debugROB((enqPtrROB + 1.U).value).waddr := rob_enq_swapped(1).waddr
     debugROB((enqPtrROB + 1.U).value).wdata := rob_enq_swapped(1).wdata
-    debugROB((enqPtrROB + 1.U).value).ready_to_commit := true.B //FIXME - 
+    debugROB((enqPtrROB + 1.U).value).csr := csr_swapped(1)
+    debugROB((enqPtrROB + 1.U).value).ready_to_commit := rob_enq_swapped_valid(1) && !rob_enq_swapped(1).ll_ind
   }
   when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     enqPtrROB := enqPtrROB + 2.U
@@ -172,7 +185,23 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   }
 
   // Wb of ROB
-  //TODO - 
+  when(io.uvm_in.ll_int_wr) {
+    for (i <- 0 until ROBSize) {
+      when(debugROB(i).valid && debugROB(i).int && io.uvm_in.ll_waddr === debugROB(i).waddr) {
+        debugROB(i).ready_to_commit := true.B
+        debugROB(i).wdata := io.uvm_in.ll_wdata
+      }
+    }
+  }
+
+  when(io.uvm_in.ll_fp_wr) {
+    for (i <- 0 until ROBSize) {
+      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_waddr === debugROB(i).waddr) {
+        debugROB(i).ready_to_commit := true.B
+        debugROB(i).wdata := io.uvm_in.ll_wdata
+      }
+    }
+  }
 
   // Commit of ROB
   val commit_valids = Wire(Vec(2, Bool()))
@@ -237,35 +266,30 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   io.uvm_out.commit_currPc := Cat(commit_bits.map(_.pc).reverse)
   io.uvm_out.commit_insn := Cat(commit_bits.map(_.insn).reverse)
   io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
-  io.uvm_out.reg_fpr := Cat(emul_int_FRF_next.map(frf => Cat(frf.tail.reverse)).reverse)
+  io.uvm_out.reg_fpr := Cat(emul_int_FRF_next.map(frf => Cat(frf.reverse)).reverse)
 
-  val old_csr = RegEnable(io.uvm_in.csr, commit_valids.reduce(_ || _))
-  val csr_swap = RegEnable(io.uvm_in.swap, commit_valids.reduce(_ || _))
-
-  io.uvm_out.csr.mstatus      := Mux(csr_swap, Cat(io.uvm_in.csr.mstatus , old_csr.mstatus ), Cat(io.uvm_in.csr.mstatus ,io.uvm_in.csr.mstatus ))
-  io.uvm_out.csr.mepc         := Mux(csr_swap, Cat(io.uvm_in.csr.mepc    , old_csr.mepc    ), Cat(io.uvm_in.csr.mepc    ,io.uvm_in.csr.mepc    ))
-  io.uvm_out.csr.mtval        := Mux(csr_swap, Cat(io.uvm_in.csr.mtval   , old_csr.mtval   ), Cat(io.uvm_in.csr.mtval   ,io.uvm_in.csr.mtval   ))
-  io.uvm_out.csr.mtvec        := Mux(csr_swap, Cat(io.uvm_in.csr.mtvec   , old_csr.mtvec   ), Cat(io.uvm_in.csr.mtvec   ,io.uvm_in.csr.mtvec   ))
-  io.uvm_out.csr.mcause       := Mux(csr_swap, Cat(io.uvm_in.csr.mcause  , old_csr.mcause  ), Cat(io.uvm_in.csr.mcause  ,io.uvm_in.csr.mcause  ))
-  io.uvm_out.csr.mip          := Mux(csr_swap, Cat(io.uvm_in.csr.mip     , old_csr.mip     ), Cat(io.uvm_in.csr.mip     ,io.uvm_in.csr.mip     ))
-  io.uvm_out.csr.mie          := Mux(csr_swap, Cat(io.uvm_in.csr.mie     , old_csr.mie     ), Cat(io.uvm_in.csr.mie     ,io.uvm_in.csr.mie     ))
-  io.uvm_out.csr.mscratch     := Mux(csr_swap, Cat(io.uvm_in.csr.mscratch, old_csr.mscratch), Cat(io.uvm_in.csr.mscratch,io.uvm_in.csr.mscratch))
-  io.uvm_out.csr.mideleg      := Mux(csr_swap, Cat(io.uvm_in.csr.mideleg , old_csr.mideleg ), Cat(io.uvm_in.csr.mideleg ,io.uvm_in.csr.mideleg ))
-  io.uvm_out.csr.medeleg      := Mux(csr_swap, Cat(io.uvm_in.csr.medeleg , old_csr.medeleg ), Cat(io.uvm_in.csr.medeleg ,io.uvm_in.csr.medeleg ))
-  io.uvm_out.csr.sstatus      := Mux(csr_swap, Cat(io.uvm_in.csr.sstatus , old_csr.sstatus ), Cat(io.uvm_in.csr.sstatus ,io.uvm_in.csr.sstatus ))
-  io.uvm_out.csr.sepc         := Mux(csr_swap, Cat(io.uvm_in.csr.sepc    , old_csr.sepc    ), Cat(io.uvm_in.csr.sepc    ,io.uvm_in.csr.sepc    ))
-  io.uvm_out.csr.stval        := Mux(csr_swap, Cat(io.uvm_in.csr.stval   , old_csr.stval   ), Cat(io.uvm_in.csr.stval   ,io.uvm_in.csr.stval   ))
-  io.uvm_out.csr.stvec        := Mux(csr_swap, Cat(io.uvm_in.csr.stvec   , old_csr.stvec   ), Cat(io.uvm_in.csr.stvec   ,io.uvm_in.csr.stvec   ))
-  io.uvm_out.csr.scause       := Mux(csr_swap, Cat(io.uvm_in.csr.scause  , old_csr.scause  ), Cat(io.uvm_in.csr.scause  ,io.uvm_in.csr.scause  ))
-  io.uvm_out.csr.satp         := Mux(csr_swap, Cat(io.uvm_in.csr.satp    , old_csr.satp    ), Cat(io.uvm_in.csr.satp    ,io.uvm_in.csr.satp    ))
-  io.uvm_out.csr.sscratch     := Mux(csr_swap, Cat(io.uvm_in.csr.sscratch, old_csr.sscratch), Cat(io.uvm_in.csr.sscratch,io.uvm_in.csr.sscratch))
-  io.uvm_out.csr.vtype        := Mux(csr_swap, Cat(io.uvm_in.csr.vtype   , old_csr.vtype   ), Cat(io.uvm_in.csr.vtype   ,io.uvm_in.csr.vtype   ))
-  io.uvm_out.csr.vcsr         := Mux(csr_swap, Cat(io.uvm_in.csr.vcsr    , old_csr.vcsr    ), Cat(io.uvm_in.csr.vcsr    ,io.uvm_in.csr.vcsr    ))
-  io.uvm_out.csr.vl           := Mux(csr_swap, Cat(io.uvm_in.csr.vl      , old_csr.vl      ), Cat(io.uvm_in.csr.vl      ,io.uvm_in.csr.vl      ))
-  io.uvm_out.csr.vstart       := Mux(csr_swap, Cat(io.uvm_in.csr.vstart  , old_csr.vstart  ), Cat(io.uvm_in.csr.vstart  ,io.uvm_in.csr.vstart  ))
-
-
-  io.uvm_out.csr.minstret := Cat(io.uvm_in.csr.minstret, io.uvm_in.csr.minstret - commit_valids(1))
+  io.uvm_out.csr.mstatus := Cat(commit_bits(1).csr.mstatus, commit_bits(0).csr.mstatus)
+  io.uvm_out.csr.mepc := Cat(commit_bits(1).csr.mepc, commit_bits(0).csr.mepc)
+  io.uvm_out.csr.mtval := Cat(commit_bits(1).csr.mtval, commit_bits(0).csr.mtval)
+  io.uvm_out.csr.mtvec := Cat(commit_bits(1).csr.mtvec, commit_bits(0).csr.mtvec)
+  io.uvm_out.csr.mcause := Cat(commit_bits(1).csr.mcause, commit_bits(0).csr.mcause)
+  io.uvm_out.csr.mip := Cat(commit_bits(1).csr.mip, commit_bits(0).csr.mip)
+  io.uvm_out.csr.mie := Cat(commit_bits(1).csr.mie, commit_bits(0).csr.mie)
+  io.uvm_out.csr.mscratch := Cat(commit_bits(1).csr.mscratch, commit_bits(0).csr.mscratch)
+  io.uvm_out.csr.mideleg := Cat(commit_bits(1).csr.mideleg, commit_bits(0).csr.mideleg)
+  io.uvm_out.csr.medeleg := Cat(commit_bits(1).csr.medeleg, commit_bits(0).csr.medeleg)
+  io.uvm_out.csr.minstret := Cat(commit_bits(1).csr.minstret, commit_bits(0).csr.minstret)
+  io.uvm_out.csr.sstatus := Cat(commit_bits(1).csr.sstatus, commit_bits(0).csr.sstatus)
+  io.uvm_out.csr.sepc := Cat(commit_bits(1).csr.sepc, commit_bits(0).csr.sepc)
+  io.uvm_out.csr.stval := Cat(commit_bits(1).csr.stval, commit_bits(0).csr.stval)
+  io.uvm_out.csr.stvec := Cat(commit_bits(1).csr.stvec, commit_bits(0).csr.stvec)
+  io.uvm_out.csr.scause := Cat(commit_bits(1).csr.scause, commit_bits(0).csr.scause)
+  io.uvm_out.csr.satp := Cat(commit_bits(1).csr.satp, commit_bits(0).csr.satp)
+  io.uvm_out.csr.sscratch := Cat(commit_bits(1).csr.sscratch, commit_bits(0).csr.sscratch)
+  io.uvm_out.csr.vtype := Cat(commit_bits(1).csr.vtype, commit_bits(0).csr.vtype)
+  io.uvm_out.csr.vcsr := Cat(commit_bits(1).csr.vcsr, commit_bits(0).csr.vcsr)
+  io.uvm_out.csr.vl := Cat(commit_bits(1).csr.vl, commit_bits(0).csr.vl)
+  io.uvm_out.csr.vstart := Cat(commit_bits(1).csr.vstart, commit_bits(0).csr.vstart)
 
   val pass = RegInit(false.B)
   when((commit_valids(0) && commit_bits(0).insn === (0x6b.U(32.W))) ||
