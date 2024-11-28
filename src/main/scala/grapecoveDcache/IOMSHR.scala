@@ -174,6 +174,7 @@ class IOMSHRFile(
   io.resp.bits.hasData := true.B
   io.resp.bits.source  := reqList(respIOMSHRIdx).source
   io.resp.bits.dest    := reqList(respIOMSHRIdx).dest
+  io.resp.bits.size    := reqList(respIOMSHRIdx).size
   io.resp.bits.status  := CacheRespStatus.refill
   io.resp.bits.data    := loadgen.data
 

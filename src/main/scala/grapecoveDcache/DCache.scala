@@ -566,6 +566,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   s1_cacheResp.valid        := s1_validFromCore && !isPrefetch(s1_req.cmd)
   s1_cacheResp.bits.source  := s1_req.source
   s1_cacheResp.bits.dest    := s1_req.dest
+  s1_cacheResp.bits.size    := s1_req.size
   s1_cacheResp.bits.hasData := (s1_hit && isRead(s1_req.cmd)) | s1_sc // FIXME SC
   s1_cacheResp.bits.data    := Mux(s1_sc, s1_scFail, loadGenAcc.genData())
   s1_cacheResp.bits.status := MuxCase(

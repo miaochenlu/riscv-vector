@@ -28,6 +28,7 @@ class DataExchangeReq extends Bundle {
 class DataExchangeResp extends Bundle {
   val source  = UInt(MasterSource.width.W)
   val dest    = UInt(destWidth.W)
+  val size    = UInt(log2Up(log2Up(dataBytes)).W)
   val status  = CacheRespStatus()
   val hasData = Bool()
   val data    = UInt(dataWidth.W)

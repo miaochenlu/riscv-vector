@@ -270,6 +270,7 @@ class ReplayModule extends Module() {
   io.toPipe.valid         := RegNext(io.toPipe.bits.nextCycleWb)
   io.toPipe.bits.regIdx   := replayMeta.regIdx
   io.toPipe.bits.sourceId := replayMeta.sourceId
+  io.toPipe.bits.size     := replayMeta.size
   io.toPipe.bits.regData  := loadgen
 
 }

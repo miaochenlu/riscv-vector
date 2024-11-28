@@ -117,6 +117,7 @@ class MSHRWrapper(
   mshrsResp.source  := mshrs.io.toPipeline.bits.sourceId
   mshrsResp.dest    := mshrs.io.toPipeline.bits.regIdx
   mshrsResp.data    := mshrs.io.toPipeline.bits.regData
+  mshrsResp.size    := mshrs.io.toPipeline.bits.size
   mshrsResp.hasData := mshrs.io.toPipeline.valid
 
   io.nextCycleWb        := mshrs.io.toPipeline.bits.nextCycleWb || iomshrs.io.nextCycleWb
