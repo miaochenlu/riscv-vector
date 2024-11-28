@@ -13,4 +13,4 @@
 [submodule "dependencies/gpc_cache"]
 	path = dependencies/gpc_cache
 	url = https://github.com/IntelLabs/riscv-vector/
-	branch = gpc_cache
+	branch = gpc_cache_stable
