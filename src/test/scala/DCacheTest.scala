@@ -37,6 +37,7 @@ trait DCacheTestTrait {
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.data.expect(DCacheInit.initData.U)
+        dut.io.resp.bits.size.expect(6.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(10)
 
@@ -62,6 +63,7 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.data.expect(DCacheInit.initData.U)
+        dut.io.resp.bits.size.expect(6.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(10)
 
@@ -72,6 +74,7 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.data.expect("h2323232323232323".U)
+        dut.io.resp.bits.size.expect(3.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(10)
 
@@ -85,6 +88,7 @@ trait DCacheTestTrait {
 
         dut.clock.step(1)
         dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.size.expect(2.U)
         dut.io.resp.bits.data.expect(
           "hffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffbbaa9988".U
         )
@@ -124,6 +128,7 @@ trait DCacheTestTrait {
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
         dut.io.resp.bits.data.expect(0.U)
+        dut.io.resp.bits.size.expect(2.U)
         dut.io.resp.bits.dest.expect(16.U)
         dut.clock.step(10)
 
@@ -135,6 +140,7 @@ trait DCacheTestTrait {
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.data.expect(0.U)
+        dut.io.resp.bits.size.expect(2.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(1)
 
@@ -150,6 +156,7 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.size.expect(0.U)
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
         dut.clock.step(1)
 
@@ -160,6 +167,7 @@ trait DCacheTestTrait {
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
         dut.io.resp.bits.data.expect("h23".U)
+        dut.io.resp.bits.size.expect(0.U)
         dut.io.resp.bits.dest.expect(16.U)
         dut.clock.step(10)
 
