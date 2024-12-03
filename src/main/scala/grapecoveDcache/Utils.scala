@@ -16,7 +16,7 @@ object toInt {
 
 object AddrDecoder {
   def getLineAddr(addr: UInt): UInt =
-    addr(addr.getWidth - blockOffBits - 1, blockOffBits)
+    addr(addr.getWidth - 1, blockOffBits)
 
   def getBlockOffset(addr: UInt): UInt =
     addr(blockOffBits - 1, 0)
