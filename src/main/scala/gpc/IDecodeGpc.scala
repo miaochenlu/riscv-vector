@@ -366,8 +366,8 @@ class FDecode(aluFn: ALUFN = ALUFN())(implicit val p: Parameters) extends Decode
     FMV_W_X->   List(Y,Y,N,N,N,N,N,Y,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N),
     FCVT_S_W->  List(Y,Y,N,N,N,N,N,Y,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N),
     FCVT_S_WU-> List(Y,Y,N,N,N,N,N,Y,A2_X,   A1_RS1, IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        N,N,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N),
-    FLW->       List(Y,Y,N,N,N,N,N,Y,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N, Y,N,N),
-    FSW->       List(Y,Y,N,N,N,N,N,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N, Y,N,N),
+    FLW->       List(Y,Y,N,N,N,N,N,Y,A2_IMM, A1_RS1, IMM_I, DW_XPR,aluFn.FN_ADD,   Y,M_XRD,      N,N,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N),
+    FSW->       List(Y,Y,N,N,N,N,N,Y,A2_IMM, A1_RS1, IMM_S, DW_XPR,aluFn.FN_ADD,   Y,M_XWR,      N,Y,N,N,N,N,N,CSR.N,N,N,N,N, N,Y,N),
     FDIV_S->    List(Y,Y,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N),
     FSQRT_S->   List(Y,Y,N,N,N,N,N,N,A2_X,   A1_X,   IMM_X, DW_X,  aluFn.FN_X,     N,M_X,        Y,Y,N,Y,N,N,N,CSR.N,N,N,N,N, N,Y,N))
 }

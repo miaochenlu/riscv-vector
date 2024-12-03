@@ -995,7 +995,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ll_waddr_p1 = div.io.resp.bits.tag
     val ll_wen_p1 = div.io.resp.fire
 
-    val m2_wdata_p0 = Mux(ll_wen_mem_p0, io.dmem.resp.bits.data(xLen - 1, 0),
+    val m2_wdata_p0 = Mux(dmem_resp_valid && dmem_resp_xpu, io.dmem.resp.bits.data(xLen - 1, 0),
       Mux(ll_wen_fire_v_int, io.vcomplete.wdata,
         Mux(m2_reg_uops(0).ctrl.csr =/= CSR.N, csr.io.rw.rdata,
           aluM2_p0.io.out)))
@@ -1025,21 +1025,42 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp && io.vcomplete.wdata_reg_idx === rdaddr
     }
 
+    def table_read(addr: UInt, table: UInt): Bool = {
+      val addrOH = Seq.tabulate(32)(addr === _.U)
+      Mux1H(addrOH, table.asBools)
+    }
+
     val m2_set_busyTable_p0 = (m2_dcache_miss_p0 || m2_reg_uops(0).vec) &&
       m2_reg_valids(0) && m2_reg_uops(0).ctrl.wxd
     val m2_set_busyTable_p1 = m2_reg_uops(1).ctrl.div && m2_wxd_p1
-    val busyTable = new BusyTable(zero = true)
-    busyTable.clear(Seq(ll_wen_p0, ll_wen_p1), Seq(m2_waddr_p0, m2_waddr_p1))
-    busyTable.set(Seq(m2_set_busyTable_p0 && !ctrl_killm2(0), m2_set_busyTable_p1 && !ctrl_killm2(1)),
-      Seq(m2_reg_uops(0).rd, m2_reg_uops(1).rd))
+    val x_table = Wire(UInt(32.W))
+    val x_busyTable = Module(new BusyTable(zero = true))
+    x_busyTable.io.setEnVec := VecInit(false.B, m2_set_busyTable_p0 && !ctrl_killm2(0), m2_set_busyTable_p1 && !ctrl_killm2(1))
+    x_busyTable.io.setAddrVec := VecInit(0.U, m2_reg_uops(0).rd, m2_reg_uops(1).rd)
+    x_busyTable.io.clrEnVec := VecInit(false.B, ll_wen_p0, ll_wen_p1)
+    x_busyTable.io.clrAddrVec := VecInit(0.U, m2_waddr_p0, m2_waddr_p1)
+    x_table := x_busyTable.io.table
+
+    // busyTable.clear(Seq(ll_wen_p0, ll_wen_p1), Seq(m2_waddr_p0, m2_waddr_p1))
+    // busyTable.set(Seq(m2_set_busyTable_p0 && !ctrl_killm2(0), m2_set_busyTable_p1 && !ctrl_killm2(1)),
+    //   Seq(m2_reg_uops(0).rd, m2_reg_uops(1).rd))
 
     val id_stall_fpu = if (usingFPU) {
-      val fp_busyTable = new BusyTable
-      fp_busyTable.clear(Seq(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp),
-        Seq(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx))
-      fp_busyTable.set(Seq((m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) &&
-        m2_reg_valids(1)), Seq(m2_reg_uops(1).rd))
-      checkHazards(fp_hazard_targets, rd => fp_busyTable.read(rd) && !id_fp_busytable_clear_bypass(rd))
+      val fp_busyTable = Module(new BusyTable())
+      val f_table = Wire(UInt(32.W))
+      fp_busyTable.io.setEnVec := VecInit(false.B, false.B, (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) &&
+        m2_reg_valids(1))
+      fp_busyTable.io.setAddrVec := VecInit(0.U, 0.U, m2_reg_uops(1).rd)
+      fp_busyTable.io.clrEnVec := VecInit(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp)
+      fp_busyTable.io.clrAddrVec := VecInit(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx)
+      f_table := fp_busyTable.io.table
+
+      //      fp_busyTable.clear(Seq(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp),
+      //        Seq(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx))
+      //      fp_busyTable.set(Seq((m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) &&
+      //        m2_reg_valids(1)), Seq(m2_reg_uops(1).rd))
+      // checkHazards(fp_hazard_targets, rd => fp_busyTable.read(rd) && !id_fp_busytable_clear_bypass(rd))
+      checkHazards(fp_hazard_targets, rd => table_read(rd, f_table))
     } else false.B
 
     // Vector Scoreboard
@@ -1244,8 +1265,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     /** Check RAW/WAW data hazard for:
      * ID <--> busy table */
-    val id_busytable_hazard_uop0 = checkHazards(hazard_targets(0), rd => busyTable.read(rd) && !id_busytable_clear_bypass(rd))
-    val id_busytable_hazard_uop1 = checkHazards(hazard_targets(1), rd => busyTable.read(rd) && !id_busytable_clear_bypass(rd))
+    val id_busytable_hazard_uop0 = checkHazards(hazard_targets(0), rd => table_read(rd, x_table) && !id_busytable_clear_bypass(rd))
+    val id_busytable_hazard_uop1 = checkHazards(hazard_targets(1), rd => table_read(rd, x_table) && !id_busytable_clear_bypass(rd))
 
     //---- id_stall ----
     val stall_singleStep = csr.io.singleStep && (ex_reg_valids.orR || m1_reg_valids.orR || m2_reg_valids.orR)
@@ -1282,9 +1303,14 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       wb_reg_wdata(1) := m2_wdata_p1
       wb_reg_waddr(1) := m2_waddr_p1
     }
+
     for (i <- 0 until 2) {
       when(!ctrl_killm2(i)) {
         wb_reg_uops(i) := m2_reg_uops(i)
+        wb_reg_uops(i).wdata_ready := m2_reg_uops(i).wdata_ready ||
+          m2_reg_uops(i).ctrl.mem && m2_reg_uops(i).ctrl.wxd &&  // For dmem m2 load resp data bypass
+            io.dmem.resp.valid && io.dmem.resp.bits.has_data &&
+            !io.dmem.resp.bits.replay && dmem_resp_xpu
         wb_reg_uops(i).ctrl.wxd := m2_reg_uops(i).ctrl.wxd
       }
       wb_reg_valids(i) := m2_valids(i) && !ctrl_killm2(i)
@@ -1379,7 +1405,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.dmem.req.bits.tag := ex_dcache_tag
     io.dmem.req.bits.cmd := Mux(ex_int_dmem_req, ex_reg_uops(0).ctrl.mem_cmd, ex_reg_uops(1).ctrl.mem_cmd)
     io.dmem.req.bits.size := Mux(ex_int_dmem_req, ex_reg_mem_size(0), ex_reg_mem_size(1))
-    io.dmem.req.bits.signed := Mux(ex_int_dmem_req, ex_reg_uops(0).inst(14), ex_reg_uops(1).inst(14))
+    io.dmem.req.bits.signed := Mux(ex_int_dmem_req, !ex_reg_uops(0).inst(14), !ex_reg_uops(1).inst(14))
     io.dmem.req.bits.phys := false.B
     io.dmem.req.bits.addr := Mux(ex_int_dmem_req, encodeVirtualAddress(ex_p0_rs(0), alu_p0.io.adder_out),
       encodeVirtualAddress(ex_p1_rs(0), alu_p1.io.adder_out))
@@ -1509,7 +1535,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         ver_module.io.uvm_in.rob_enq(i).bits.int := wb_reg_uops(i).ctrl.wxd
         ver_module.io.uvm_in.rob_enq(i).bits.fp := wb_reg_uops(i).wfd
         ver_module.io.uvm_in.rob_enq(i).bits.waddr := wb_reg_waddr(i)
-        ver_module.io.uvm_in.rob_enq(i).bits.wdata := wb_reg_wdata(i)
+        ver_module.io.uvm_in.rob_enq(i).bits.wdata := Mux(wb_reg_uops(i).ctrl.wxd, wb_reg_wdata(i), RegNext(Mux((io.dmem.resp.bits.size === 2.U) && m2_reg_uops(i).wfd, Cat(~0.U(32.W), io.dmem.resp.bits.data(31, 0)), io.dmem.resp.bits.data(xLen - 1, 0))))
         ver_module.io.uvm_in.rob_enq(i).bits.ll_ind := ll_ind(i)
       }
 
@@ -1593,35 +1619,74 @@ object ImmGen {
   }
 }
 
-class BusyTable(zero: Boolean = false) {
+// class BusyTable(zero: Boolean = false) {
+//   val table = RegInit(0.U(32.W))
+//   dontTouch(table)
+//
+//   def reqVecToMask(enVec: Seq[Bool], addrVec: Seq[UInt]): UInt = {
+//     enVec zip addrVec map { case (en, addr) => Mux(en, UIntToOH(addr), 0.U) } reduce {
+//       _ | _
+//     }
+//   }
+//
+//   def read(addr: UInt): Bool = {
+//     val addrOH = Seq.tabulate(32)(addr === _.U)
+//     Mux1H(addrOH, table.asBools)
+//   }
+//
+//   def clear(enVec: Seq[Bool], addrVec: Seq[UInt]): Unit = {
+//     table := table & (~reqVecToMask(enVec, addrVec))
+//   }
+//
+//   def set(enVec: Seq[Bool], addrVec: Seq[UInt]): Unit = {
+//     val updated = table | reqVecToMask(enVec, addrVec)
+//     table := {
+//       if (!zero) updated else {
+//         updated & "hFFFF_FFFE".U
+//       }
+//     }
+//   }
+//
+// }
+
+class BusyTable(zero: Boolean = false) extends Module {
+  val io = IO(new Bundle {
+    val setEnVec = Input(Vec(3, Bool()))
+    val setAddrVec = Input(Vec(3, UInt(5.W)))
+    val clrEnVec = Input(Vec(3, Bool()))
+    val clrAddrVec = Input(Vec(3, UInt(5.W)))
+    val table = Output(UInt(32.W))
+    // val read = Output(Bool())
+    // val readAddr = Input(UInt(5.W))
+  })
+
   val table = RegInit(0.U(32.W))
-  dontTouch(table)
+  val table_next = Wire(UInt(32.W))
+  val setMask = Wire(UInt(32.W))
+  val clrMask = Wire(UInt(32.W))
+  io.table := table
 
-  def reqVecToMask(enVec: Seq[Bool], addrVec: Seq[UInt]): UInt = {
-    enVec zip addrVec map { case (en, addr) => Mux(en, UIntToOH(addr), 0.U) } reduce {
-      _ | _
-    }
+  setMask := io.setAddrVec.zip(io.setEnVec).map { case (addr, en) => Mux(en, UIntToOH(addr, 32), 0.U) }.reduce {
+    _ | _
   }
 
-  def set(enVec: Seq[Bool], addrVec: Seq[UInt]): Unit = {
-    val updated = table | reqVecToMask(enVec, addrVec)
-    table := {
-      if (!zero) updated else {
-        updated & "hFFFF_FFFE".U
-      }
-    }
+  clrMask := io.clrAddrVec.zip(io.clrEnVec).map { case (addr, en) => Mux(en, UIntToOH(addr, 32), 0.U) }.reduce {
+    _ | _
   }
 
-  def clear(enVec: Seq[Bool], addrVec: Seq[UInt]): Unit = {
-    table := table & (~reqVecToMask(enVec, addrVec))
-  }
+  // io.read := Mux1H(Seq.tabulate(32)(i => io.readAddr === i.U), table.asBools)
+  //  def read(addr: UInt): Bool = {
+  //    val addrOH = Seq.tabulate(32)(addr === _.U)
+  //    Mux1H(addrOH, table.asBools)
+  //  }
 
-  def read(addr: UInt): Bool = {
-    val addrOH = Seq.tabulate(32)(addr === _.U)
-    Mux1H(addrOH, table.asBools)
+  table_next := table & (~clrMask) | setMask
+  if (!zero) {
+    table := table_next
+  } else {
+    table := table_next & "hFFFF_FFFE".U
   }
 }
-
 
 // object Main extends App {
 //   println("Generating hardware of grape cove main pipe")
