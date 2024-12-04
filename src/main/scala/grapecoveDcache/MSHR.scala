@@ -142,7 +142,7 @@ class MSHR(id: Int) extends Module() {
   sentPermission := mshrPerm
 
   // enqueue the sender
-  io.senderPermission := mshrPerm
+  io.senderPermission := Mux(probeReq && io.probeLineAddrMatch, sentPermission, mshrPerm)
 
   io.senderLineAddr := lineAddrReg
 
@@ -497,8 +497,8 @@ class MSHRFile extends Module() {
   senderQueue.io.enq.valid := allocateList.asUInt.orR
   senderQueue.io.enq.bits  := allocateIdx
 
-  io.toL2Req.valid         := senderQueue.io.deq.valid // && !dataArrayWriteEna
-  senderQueue.io.deq.ready := io.toL2Req.ready         // && !dataArrayWriteEna
+  io.toL2Req.valid         := senderQueue.io.deq.valid && !probeReq
+  senderQueue.io.deq.ready := io.toL2Req.ready && !probeReq
   io.toL2Req.bits.perm     := senderPermissionList(senderQueue.io.deq.bits)
   io.toL2Req.bits.entryId  := senderQueue.io.deq.bits
   io.toL2Req.bits.lineAddr := lineAddrList(senderQueue.io.deq.bits)
