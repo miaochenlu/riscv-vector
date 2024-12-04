@@ -373,27 +373,15 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // * pipeline stage 3 End
 
-  // * pipeline stage 4 Begin
-  // used for forwarding
-  val s4_valid  = RegNext(s3_valid)
-  val s4_req    = RegEnable(s3_req, s3_valid)
-  val s4_newCoh = RegEnable(s3_newCoh, s3_valid)
-  val s4_repCoh = RegEnable(s3_repCoh, s3_valid)
-  val s4_wayEn  = RegEnable(s3_wayEn, s3_valid)
-  val s4_tag    = RegEnable(s3_tag, s3_valid)
-  // * pipeline stage 4 End
-
   // * Store -> Load Bypassing Begin
 
   // s2/s3/s4 -> s1
   val s2_bypassStoreCandidate = createBypassStore(s2_storeData, getTag(s2_req.paddr), s2_newCoh, s2_wayEn)
   val s3_bypassStoreCandidate = createBypassStore(s3_req.wdata, getTag(s3_req.paddr), s3_newCoh, s3_wayEn)
-  val s4_bypassStoreCandidate = createBypassStore(s4_req.wdata, getTag(s4_req.paddr), s4_newCoh, s4_wayEn)
 
   val bypassList = List(
     (s2_valid, s2_req, s2_bypassStoreCandidate, s2_tag, s2_repCoh),
     (s3_valid, s3_req, s3_bypassStoreCandidate, s3_tag, s3_repCoh),
-    (s4_valid, s4_req, s4_bypassStoreCandidate, s4_tag, s4_repCoh),
   ).map(r =>
     (
       r._1 &&
