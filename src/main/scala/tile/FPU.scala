@@ -205,17 +205,27 @@ class FPUCoreIO(implicit p: Parameters) extends CoreBundle()(p) {
   val sboard_clra = Output(UInt(5.W))
 
   val keep_clock_enabled = Input(Bool())
-  
+
   // Vector write-back
   val vfp_wb = Flipped(Decoupled(new Bundle {
     val wdata = UInt(xLen.W)
     val waddr = UInt(5.W)
   }))
+
+  val wr0_en = coreParams.useVerif.option(Output(Bool()))
+  val wr0_addr = coreParams.useVerif.option(Output(UInt(5.W)))
+  val wr0_data = coreParams.useVerif.option(Output(UInt(64.W)))
+  val wr1_en = coreParams.useVerif.option(Output(Bool()))
+  val wr1_addr = coreParams.useVerif.option(Output(UInt(5.W)))
+  val wr1_data = coreParams.useVerif.option(Output(UInt(64.W)))
+
 }
 
 class FPUIO(implicit p: Parameters) extends FPUCoreIO ()(p) {
   val cp_req = Flipped(Decoupled(new FPInput())) //cp doesn't pay attn to kill sigs
   val cp_resp = Decoupled(new FPResult())
+
+
 }
 
 class FPResult(implicit p: Parameters) extends CoreBundle()(p) {
@@ -804,9 +814,16 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
     regfile(io.vfp_wb.bits.waddr) := io.vfp_wb.bits.wdata
   }
 
+  if (coreParams.useVerif) {
+    io.wr0_en.get := load_wb
+    io.wr0_addr.get := load_wb_tag
+    io.wr0_data.get := ieee(recode(load_wb_data, load_wb_typeTag))
+  }
+
   when (load_wb) {
     val wdata = recode(load_wb_data, load_wb_typeTag)
     regfile(load_wb_tag) := wdata
+
     assert(consistent(wdata))
     if (enableCommitLog)
       printf("f%d p%d 0x%x\n", load_wb_tag, load_wb_tag + 32.U, ieee(wdata))
@@ -947,9 +964,17 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
   val wtypeTag = Mux(divSqrt_wen, divSqrt_typeTag, wbInfo(0).typeTag)
   val wdata = box(Mux(divSqrt_wen, divSqrt_wdata, (pipes.map(_.res.data): Seq[UInt])(wbInfo(0).pipeid)), wtypeTag)
   val wexc = (pipes.map(_.res.exc): Seq[UInt])(wbInfo(0).pipeid)
+
+  if (coreParams.useVerif) {
+    io.wr1_en.get := (!wbInfo(0).cp && wen(0)) || divSqrt_wen
+    io.wr1_addr.get := waddr
+    io.wr1_data.get := ieee(wdata)
+  }
+
   when ((!wbInfo(0).cp && wen(0)) || divSqrt_wen) {
     assert(consistent(wdata))
     regfile(waddr) := wdata
+
     if (enableCommitLog) {
       printf("f%d p%d 0x%x\n", waddr, waddr + 32.U, ieee(wdata))
     }

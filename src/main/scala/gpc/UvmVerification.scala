@@ -100,9 +100,15 @@ class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   //  val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
   val csr = Input(new VerInCSR)
   val ll_int_wr = Input(Bool()) // Long latency int back: int load miss for pipe0 and int div for pipe1
-  val ll_fp_wr = Input(Bool()) // Long latency fp pipe1 back: fp load miss, fp div/sqrt to be added
-  val ll_waddr = Input(UInt(5.W))
-  val ll_wdata = Input(UInt(xLen.W)) // int/fp, wdata of enq is not available for long-latency instrn
+  val ll_int_waddr = Input(UInt(5.W))
+  val ll_int_wdata = Input(UInt(xLen.W))
+  val ll_fp_wr0 = Input(Bool()) // Long latency fp dmem
+  val ll_fp_waddr0 = Input(UInt(5.W))
+  val ll_fp_wdata0 = Input(UInt(xLen.W))
+  val ll_fp_wr1 = Input(Bool()) // Long latency fp fma/div/sqrt
+  val ll_fp_waddr1 = Input(UInt(5.W))
+  val ll_fp_wdata1 = Input(UInt(xLen.W))
+
   //TODO - add other signals such as csr and vector wb
 }
 
@@ -187,18 +193,27 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   // Wb of ROB
   when(io.uvm_in.ll_int_wr) {
     for (i <- 0 until ROBSize) {
-      when(debugROB(i).valid && debugROB(i).int && io.uvm_in.ll_waddr === debugROB(i).waddr) {
+      when(debugROB(i).valid && debugROB(i).int && io.uvm_in.ll_int_waddr === debugROB(i).waddr) {
         debugROB(i).ready_to_commit := true.B
-        debugROB(i).wdata := io.uvm_in.ll_wdata
+        debugROB(i).wdata := io.uvm_in.ll_int_wdata
       }
     }
   }
 
-  when(io.uvm_in.ll_fp_wr) {
+  when(io.uvm_in.ll_fp_wr0) {
     for (i <- 0 until ROBSize) {
-      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_waddr === debugROB(i).waddr) {
+      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_fp_waddr0 === debugROB(i).waddr) {
         debugROB(i).ready_to_commit := true.B
-        debugROB(i).wdata := io.uvm_in.ll_wdata
+        debugROB(i).wdata := io.uvm_in.ll_fp_wdata0
+      }
+    }
+  }
+
+  when(io.uvm_in.ll_fp_wr1) {
+    for (i <- 0 until ROBSize) {
+      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_fp_waddr1 === debugROB(i).waddr) {
+        debugROB(i).ready_to_commit := true.B
+        debugROB(i).wdata := io.uvm_in.ll_fp_wdata1
       }
     }
   }

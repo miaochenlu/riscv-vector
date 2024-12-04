@@ -1915,7 +1915,6 @@ class CSRFile(
     vstart := reg_vstart.get
 
     io.mepc.get := mepc
-    io.mepc.get := mepc
     io.mtval.get := mtval
     io.mtvec.get := mtvec
     io.mcause.get := mcause
