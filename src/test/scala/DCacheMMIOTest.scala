@@ -103,7 +103,7 @@ trait DCacheMMIOTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.replay)
         dut.clock.step(1)
 
         // refill resp
