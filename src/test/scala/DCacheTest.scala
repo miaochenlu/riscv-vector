@@ -225,7 +225,7 @@ trait DCacheTestTrait {
         // req miss
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(CacheReqBundle(
-          paddr = "h8000a000",
+          paddr = "h68000a000",
           cmd = M_PWR,
           size = 6,
           wdata = "h0101010112345678",
@@ -239,12 +239,12 @@ trait DCacheTestTrait {
         dut.clock.step(1)
 
         // wait store
-        dut.clock.step(200)
+        dut.clock.step(30)
 
         // read hit after refill
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(CacheReqBundle(
-          paddr = "h8000a000",
+          paddr = "h68000a000",
           cmd = M_XRD,
           size = 3,
         )))
@@ -252,7 +252,7 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h0101010123232323".U)
+        dut.io.resp.bits.data.expect("h0101010100000000".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(1)
       }
