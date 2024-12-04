@@ -488,13 +488,17 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
      */
     //---- RAW bypass: for R, find the nearest valid W. If W is not ready,
     //                 discard RAW bypass of this stage.
+
+    val ll_wen_wb = RegInit(VecInit(Seq.fill(2)(false.B)))
+    val wb_reg_waddr = Reg(Vec(2, UInt(5.W)))
+
     val bypass_sources_all = Seq(
       (m1_reg_uops(0).rd, m1_reg_wdata(0), m1_reg_uops(0).ctrl.wxd, m1_reg_valids(0), m1_reg_uops(0).wdata_ready),
       (m1_reg_uops(1).rd, m1_reg_wdata(1), m1_reg_uops(1).ctrl.wxd, m1_reg_valids(1), m1_reg_uops(1).wdata_ready),
       (m2_reg_uops(0).rd, m2_reg_wdata(0), m2_reg_uops(0).ctrl.wxd, m2_reg_valids(0), m2_reg_uops(0).wdata_ready),
       (m2_reg_uops(1).rd, m2_reg_wdata(1), m2_reg_uops(1).ctrl.wxd, m2_reg_valids(1), m2_reg_uops(1).wdata_ready),
-      (wb_reg_uops(0).rd, wb_reg_wdata(0), wb_reg_uops(0).ctrl.wxd, wb_reg_valids(0), wb_reg_uops(0).wdata_ready),
-      (wb_reg_uops(1).rd, wb_reg_wdata(1), wb_reg_uops(1).ctrl.wxd, wb_reg_valids(1), wb_reg_uops(1).wdata_ready)
+      (wb_reg_waddr(0), wb_reg_wdata(0), wb_reg_uops(0).ctrl.wxd || ll_wen_wb(0), wb_reg_valids(0) || ll_wen_wb(0), wb_reg_uops(0).wdata_ready),
+      (wb_reg_waddr(1), wb_reg_wdata(1), wb_reg_uops(1).ctrl.wxd || ll_wen_wb(1), wb_reg_valids(1) || ll_wen_wb(1), wb_reg_uops(1).wdata_ready)
     )
     val bypass_sinks_ex = Seq(
       (ex_reg_uops(0).rs1, ex_reg_uops(0).rxs1),
@@ -1294,9 +1298,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     /** WB stage
      */
-    val ll_wen_wb = RegNext(VecInit(ll_wen_p0, ll_wen_p1))
+    val ll_wen_m2 = VecInit(ll_wen_p0, ll_wen_p1)
+    ll_wen_wb := VecInit(ll_wen_p0, ll_wen_p1)
     val rf_wen = Wire(Vec(2, Bool()))
-    val wb_reg_waddr = Reg(Vec(2, chiselTypeOf(m2_waddr_p0)))
     when(!ctrl_killm2(0) || ll_wen_p0) {
       wb_reg_wdata(0) := m2_wdata_p0
       wb_reg_waddr(0) := m2_waddr_p0
@@ -1312,7 +1316,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         wb_reg_uops(i).wdata_ready := m2_reg_uops(i).wdata_ready ||
           m2_reg_uops(i).ctrl.mem && m2_reg_uops(i).ctrl.wxd && // For dmem m2 load resp data bypass
             io.dmem.resp.valid && io.dmem.resp.bits.has_data &&
-            !io.dmem.resp.bits.replay && dmem_resp_xpu
+            !io.dmem.resp.bits.replay && dmem_resp_xpu ||
+          ll_wen_m2(i)
         wb_reg_uops(i).ctrl.wxd := m2_reg_uops(i).ctrl.wxd
       }
       wb_reg_valids(i) := m2_valids(i) && !ctrl_killm2(i)
