@@ -13,16 +13,13 @@ class DCacheWrapper(isTest: Boolean)(
 
   val dcacheClient = LazyModule(new GPCDCache()(p))
 
-  val mmio = LazyModule(new TLRAM(AddressSet(0x6000_0000L, 0x1fff_ffffL), beatBytes = beatBytes, atomics = true))
-  val rams = if (isTest) { // use small range for local test
-    Seq(LazyModule(new TLRAM(AddressSet(0x8000_0000L, 0x7fff_ffffL), beatBytes = beatBytes, atomics = true)))
-  } else { // large range
-    (1 until 7).map(i =>
-      LazyModule(new TLRAM(AddressSet(i * 0x10_0000_0000L, 0xf_ffff_ffffL), beatBytes = beatBytes, atomics = true))
-    ) ++ (1 until 15).map(i =>
-      LazyModule(new TLRAM(AddressSet(i * 0x1_0000_0000L, 0xffff_ffffL), beatBytes = beatBytes, atomics = true))
-    ) :+ LazyModule(new TLRAM(AddressSet(0x8000_0000L, 0x7fff_ffffL), beatBytes = beatBytes, atomics = true))
-  }
+  val mmioRange        = AddressSet(0x6000_0000L, 0x1fff_ffffL)
+  val uncacheableRange = AddressSet(0x0, 0x7fff_ffffL)
+  val ramRange = if (isTest) { Seq(AddressSet(0x8000_0000L, 0x7fff_ffffL)) }
+  else { AddressSet(0x0, 0x7f_ffff_ffffL).subtract(uncacheableRange) }
+
+  val mmio = LazyModule(new TLRAM(mmioRange, beatBytes = beatBytes, atomics = true))
+  val rams = ramRange.map(x => LazyModule(new TLRAM(x, beatBytes = beatBytes, atomics = true)))
 
   val xbar = TLXbar()
   mmio.node := xbar
