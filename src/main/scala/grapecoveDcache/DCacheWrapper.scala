@@ -7,16 +7,22 @@ import freechips.rocketchip.tilelink._
 import freechips.rocketchip.devices.tilelink._
 import _root_.circt.stage.ChiselStage
 
-class DCacheWrapper()(
+class DCacheWrapper(isTest: Boolean)(
     implicit p: Parameters
 ) extends LazyModule {
 
   val dcacheClient = LazyModule(new GPCDCache()(p))
 
-  val mmio = LazyModule(new TLRAM(AddressSet(0x60000000L, 0x1fffffffL), beatBytes = beatBytes, atomics = true))
-  val rams = (1 until 7).map(i =>
-    LazyModule(new TLRAM(AddressSet(i * 0x100000000L, 0xffffffffL), beatBytes = beatBytes, atomics = true))
-  ) :+ LazyModule(new TLRAM(AddressSet(0x80000000L, 0x7fffffffL), beatBytes = beatBytes, atomics = true))
+  val mmio = LazyModule(new TLRAM(AddressSet(0x6000_0000L, 0x1fff_ffffL), beatBytes = beatBytes, atomics = true))
+  val rams = if (isTest) { // use small range for local test
+    Seq(LazyModule(new TLRAM(AddressSet(0x8000_0000L, 0x7fff_ffffL), beatBytes = beatBytes, atomics = true)))
+  } else { // large range
+    (1 until 7).map(i =>
+      LazyModule(new TLRAM(AddressSet(i * 0x10_0000_0000L, 0xf_ffff_ffffL), beatBytes = beatBytes, atomics = true))
+    ) ++ (1 until 15).map(i =>
+      LazyModule(new TLRAM(AddressSet(i * 0x1_0000_0000L, 0xffff_ffffL), beatBytes = beatBytes, atomics = true))
+    ) :+ LazyModule(new TLRAM(AddressSet(0x8000_0000L, 0x7fff_ffffL), beatBytes = beatBytes, atomics = true))
+  }
 
   val xbar = TLXbar()
   mmio.node := xbar
@@ -51,7 +57,7 @@ object Main extends App {
     "--disable-all-randomization",
   )
 
-  lazy val dcacheWrapper = LazyModule(new DCacheWrapper()(Parameters.empty))
+  lazy val dcacheWrapper = LazyModule(new DCacheWrapper(false)(Parameters.empty))
   ChiselStage.emitSystemVerilogFile(dcacheWrapper.dcacheClient.module, args, firtoolOptions)
   // ChiselStage.emitSystemVerilogFile(
   //   dcacheWrapper.dcacheClient.module,
