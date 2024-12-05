@@ -19,7 +19,7 @@ trait DCacheMMIOTestTrait {
 
   def cacheTest0(): Unit =
     it should "pass: cache mmio load" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -73,7 +73,7 @@ trait DCacheMMIOTestTrait {
 
   def cacheTest1(): Unit =
     it should "pass: cache mmio store" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -96,7 +96,7 @@ trait DCacheMMIOTestTrait {
         dut.io.resp.bits.status.expect(CacheRespStatus.miss)
         dut.clock.step(1)
 
-        // read miss
+        // read replay
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq))
 
@@ -104,6 +104,18 @@ trait DCacheMMIOTestTrait {
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.replay)
+        dut.clock.step(1)
+
+        dut.clock.step(20)
+
+        // read miss
+        dut.io.req.valid.poke(true.B)
+        dut.io.req.bits.poke(genReq(cacheReq))
+
+        dut.clock.step(1)
+        dut.io.req.valid.poke(false.B)
+        dut.io.resp.valid.expect(true.B)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
         dut.clock.step(1)
 
         // refill resp

@@ -19,7 +19,7 @@ trait DCacheBypassTestTrait {
 
   def cacheTest0(): Unit =
     it should "pass: cache bypass load" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -72,7 +72,7 @@ trait DCacheBypassTestTrait {
 
   def cacheTest1(): Unit =
     it should "pass: cache bypass store" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -121,7 +121,7 @@ trait DCacheBypassTestTrait {
 
   def cacheTest2(): Unit =
     it should "pass: cache bypass partial masked store" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)

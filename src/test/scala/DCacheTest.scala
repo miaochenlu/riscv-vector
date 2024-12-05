@@ -19,7 +19,7 @@ trait DCacheTestTrait {
 
   def cacheTest0(): Unit =
     it should "pass: cache load hit" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -45,7 +45,7 @@ trait DCacheTestTrait {
 
   def cacheTest1(): Unit =
     it should "pass: cache load hit (different sizes and sign/unsigned)" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -96,7 +96,7 @@ trait DCacheTestTrait {
 
   def cacheTest2(): Unit =
     it should "pass: cache load miss" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -168,7 +168,7 @@ trait DCacheTestTrait {
 
   def cacheTest3(): Unit =
     it should "pass: cache store miss" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -209,7 +209,7 @@ trait DCacheTestTrait {
 
   def cacheTest4(): Unit =
     it should "pass: cache partial store miss" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -217,7 +217,7 @@ trait DCacheTestTrait {
         // req miss
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(CacheReqBundle(
-          paddr = "h68000a000",
+          paddr = "h8000a000",
           cmd = M_PWR,
           size = 6,
           wdata = "h0101010112345678",
@@ -236,7 +236,7 @@ trait DCacheTestTrait {
         // read hit after refill
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(CacheReqBundle(
-          paddr = "h68000a000",
+          paddr = "h8000a000",
           cmd = M_XRD,
           size = 3,
         )))
@@ -244,7 +244,7 @@ trait DCacheTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h0101010100000000".U)
+        dut.io.resp.bits.data.expect("h0101010123232323".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
         dut.clock.step(1)
       }
@@ -252,7 +252,7 @@ trait DCacheTestTrait {
 
   def cacheTest5(): Unit =
     it should "pass: block miss that occurs in WBQ" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
