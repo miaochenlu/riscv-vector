@@ -68,7 +68,7 @@ class VerOutIO(implicit p: Parameters) extends CoreBundle()(p) {
   val trap_valid = Output(Bool())
   val trap_code = Output(UInt((xLen).W))
 
-  val reg_gpr = Output(UInt((NRET * 31 * xLen).W))
+  val reg_gpr = Output(UInt((NRET * 32 * xLen).W))
   val reg_fpr = Output(UInt((NRET * 32 * fLen).W))
   val reg_vpr = Output(UInt((NRET * 32 * vLen).W))
 
@@ -280,7 +280,7 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   io.uvm_out.commit_valid := commit_valids.asUInt
   io.uvm_out.commit_currPc := Cat(commit_bits.map(_.pc).reverse)
   io.uvm_out.commit_insn := Cat(commit_bits.map(_.insn).reverse)
-  io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.tail.reverse)).reverse)
+  io.uvm_out.reg_gpr := Cat(emul_int_RF_next.map(rf => Cat(rf.reverse)).reverse)
   io.uvm_out.reg_fpr := Cat(emul_int_FRF_next.map(frf => Cat(frf.reverse)).reverse)
 
   io.uvm_out.csr.mstatus := Cat(commit_bits(1).csr.mstatus, commit_bits(0).csr.mstatus)
