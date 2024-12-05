@@ -410,6 +410,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val hazard_targets_origin = id_uops_origin map {
       hazard_targets_gen(_)
     }
+
     val dataHazard_between_origin_uops = checkHazards(hazard_targets_origin(1), _ === id_uops_origin(0).rd) && id_uops_origin(0).ctrl.wxd
     when(!id_swap && (!readys_swapped(0) || dataHazard_between_origin_uops)) {
       readys_in(1) := false.B
@@ -1275,6 +1276,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val id_busytable_hazard_uop1 = checkHazards(hazard_targets(1), rd => table_read(rd, x_table) && !id_busytable_clear_bypass(rd))
 
     //---- id_stall ----
+    val dataHazard_between_uops_fcsr = id_csr_en && csr.io.decode(0).fp_csr && id_ctrls(1).fp // Let FP go, CSR wait until fcsr ready
+    when(id_swap && dataHazard_between_uops_fcsr) {
+      readys_in(1) := false.B
+      id_valids(0) := false.B
+    }
+
     val stall_singleStep = csr.io.singleStep && (ex_reg_valids.orR || m1_reg_valids.orR || m2_reg_valids.orR)
     id_stall(0) := id_ex_hazard_uop0 || id_m1_hazard_uop0 || id_m2_hazard_uop0 || id_busytable_hazard_uop0 ||
       stall_singleStep ||
@@ -1282,6 +1289,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       id_do_fence ||
       csr.io.csr_stall ||
       id_reg_pause ||
+      id_csr_en && csr.io.decode(0).fp_csr && !io.fpu.fcsr_rdy ||
       vsb_almost_full && id_uops(0).vec ||
       vsb_stall_id ||
       (id_int_dmem_req && id_fp_dmem_req && id_swap)
@@ -1291,7 +1299,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       id_do_fence ||
       csr.io.csr_stall ||
       id_reg_pause ||
-      id_csr_en && csr.io.decode(0).fp_csr && !io.fpu.fcsr_rdy ||
       id_ctrls(1).fp && id_stall_fpu ||
       id_ctrls(1).div && (!(div.io.req.ready || (div.io.resp.valid && !m2_wxd_p1)) || div.io.req.valid) || // reduce odds of replay
       (id_int_dmem_req && id_fp_dmem_req && !id_swap)
