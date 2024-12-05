@@ -19,7 +19,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest0(): Unit =
     it should "pass: amoswap hit" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -52,7 +52,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest1(): Unit =
     it should "pass: amoswap miss" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -121,7 +121,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest2(): Unit =
     it should "pass: amoadd hit" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -157,7 +157,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest3(): Unit =
     it should "pass: lrsc success" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -210,7 +210,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest4(): Unit =
     it should "pass: lr success sc fail" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -265,7 +265,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest5(): Unit =
     it should "pass: lr fail->success sc success" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
@@ -319,7 +319,7 @@ trait DCacheAMOTestTrait {
 
   def cacheTest6(): Unit =
     it should "pass: amoadd no perm miss" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)

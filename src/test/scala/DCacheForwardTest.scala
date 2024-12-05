@@ -20,7 +20,7 @@ trait DCacheForwardTestTrait {
 
   def cacheTest0(): Unit =
     it should "pass: N->Dirty store->load forwarding" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
@@ -65,7 +65,7 @@ trait DCacheForwardTestTrait {
 
   def cacheTest1(): Unit =
     it should "pass: T->Dirty store->load forwarding" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
@@ -110,7 +110,7 @@ trait DCacheForwardTestTrait {
 
   def cacheTest2(): Unit =
     it should "pass: B->Dirty store->load forwarding" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
@@ -172,7 +172,7 @@ trait DCacheForwardTestTrait {
 
   def cacheTest3(): Unit =
     it should "pass: replace->load forwarding" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         val cacheReq = CacheReqBundle(
@@ -217,7 +217,7 @@ trait DCacheForwardTestTrait {
 
   def cacheTest4(): Unit =
     it should "pass: probe->load forwarding" in {
-      test(LazyModule(new DCacheWrapper()(Parameters.empty)).module).withAnnotations(
+      test(LazyModule(new DCacheWrapper(true)(Parameters.empty)).module).withAnnotations(
         Seq(VerilatorBackendAnnotation, WriteVcdAnnotation)
       ) { dut =>
         DCacheInit.initDut(dut)
