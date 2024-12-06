@@ -1055,8 +1055,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val id_stall_fpu = if (usingFPU) {
       val fp_busyTable = Module(new BusyTable())
       val f_table = Wire(UInt(32.W))
-      fp_busyTable.io.setEnVec := VecInit(false.B, false.B, (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) &&
-        m2_reg_valids(1))
+      fp_busyTable.io.setEnVec := VecInit(false.B, false.B, (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd ||
+        io.fpu.sboard_set && !io.fpu.sboard_clr || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1))
       fp_busyTable.io.setAddrVec := VecInit(0.U, 0.U, m2_reg_uops(1).rd)
       fp_busyTable.io.clrEnVec := VecInit(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp)
       fp_busyTable.io.clrAddrVec := VecInit(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx)
@@ -1493,9 +1493,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       val wr0_en = io.fpu.wr0_en.get
       val wr0_addr = io.fpu.wr0_addr.get
       val wr0_data = io.fpu.wr0_data.get
-      val wr1_en = io.fpu.wr1_en.get
-      val wr1_addr = io.fpu.wr1_addr.get
-      val wr1_data = io.fpu.wr1_data.get
+      val wr1_en = RegNext(io.fpu.wr1_en.get)
+      val wr1_addr = RegNext(io.fpu.wr1_addr.get)
+      val wr1_data = RegNext(io.fpu.wr1_data.get)
 
       val fp_wdata = Mux(wr0_en, wr0_data, wr1_data)
 
@@ -1511,7 +1511,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
       ll_ind(0) := m2_set_busyTable_p0 && !ctrl_killm2(0)
       ll_ind(1) := m2_set_busyTable_p1 && !ctrl_killm2(1) ||
-        (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set ||
+        (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr ||
           m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1)
 
       ver_module.io.uvm_in := DontCare
@@ -1544,7 +1544,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       ver_module.io.uvm_in.ll_fp_wr0 := RegNext(dmem_resp_replay && dmem_resp_fpu)
       ver_module.io.uvm_in.ll_fp_waddr0 := wr0_addr
       ver_module.io.uvm_in.ll_fp_wdata0 := wr0_data
-      ver_module.io.uvm_in.ll_fp_wr1 := io.fpu.sboard_clr || io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp
+      ver_module.io.uvm_in.ll_fp_wr1 := wr1_en
       ver_module.io.uvm_in.ll_fp_waddr1 := wr1_addr // todo: vector to be added
       ver_module.io.uvm_in.ll_fp_wdata1 := wr1_data
 
@@ -1703,6 +1703,7 @@ class BusyTable(zero: Boolean = false) extends Module {
   //  }
 
   table_next := table & (~clrMask) | setMask
+
   if (!zero) {
     table := table_next
   } else {
