@@ -515,6 +515,21 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       Mux(!swap(0), Mux(hits(1) && hits(0), 1.U(2.W), hits.asUInt), Mux(hits(1) && hits(0), 2.U(2.W), hits.asUInt))
     }
 
+    // Select the youngest hit bit from four bits, output is one-hot 4-bit UInt
+    def hit_sel_4[T <: Data](hits: Seq[Bool], swap: Seq[Bool]): UInt = {
+      require(hits.size == 4 && swap.size == 2)
+      val hit_oneHot = Wire(Vec(2, UInt(2.W)))
+      // Process the first two bits
+      val t0 = hit_sel_2(hits.take(2), swap.take(1))
+      // Process the last two bits
+      val t1 = hit_sel_2(hits.drop(2), swap.drop(1))
+      // Assign the results to the hit_oneHot vector
+      hit_oneHot(0) := t0
+      hit_oneHot(1) := Mux(t0 =/= 0.U, 0.U, t1)
+      // Return the one-hot encoded result as UInt
+      hit_oneHot.asUInt
+    }
+
     // Select the youngest hit bit from six bits, output is one-hot 6-bit UInt
     def hit_sel_6[T <: Data](hits: Seq[Bool], swap: Seq[Bool]): UInt = {
       require(hits.size == 6 && swap.size == 3)
@@ -728,10 +743,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (m1_reg_uops(1).rs2, m1_reg_uops(1).rxs2)
     )
     val m1_p0_rs_byps = (0 to 1) map { i =>
-      bypass_check(bypass_sinks_m1(i), bypass_sources_all.drop(4), bypass_swaps_all.drop(2), hit_sel_2)
+      bypass_check(bypass_sinks_m1(i), bypass_sources_all.drop(2), bypass_swaps_all.drop(1), hit_sel_4)
     }
     val m1_p1_rs_byps = (2 to 3) map { i =>
-      bypass_check(bypass_sinks_m1(i), bypass_sources_all.drop(4), bypass_swaps_all.drop(2), hit_sel_2)
+      bypass_check(bypass_sinks_m1(i), bypass_sources_all.drop(2), bypass_swaps_all.drop(1), hit_sel_4)
     }
     val m1_p0_rs = (0 until 2) map { i =>
       Mux(m1_p0_rs_byps(i)._2, m1_p0_rs_byps(i)._3, m1_reg_rsdata(0)(i))
@@ -1324,7 +1339,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
           m2_reg_uops(i).ctrl.mem && m2_reg_uops(i).ctrl.wxd && // For dmem m2 load resp data bypass
             io.dmem.resp.valid && io.dmem.resp.bits.has_data &&
             !io.dmem.resp.bits.replay && dmem_resp_xpu ||
-          ll_wen_m2(i)
+          ll_wen_m2(i) ||
+          m2_rs_ready(i).reduce(_ && _) && m2_reg_uops(i).ctrl.alu
+
         wb_reg_uops(i).ctrl.wxd := m2_reg_uops(i).ctrl.wxd
       }
       wb_reg_valids(i) := m2_valids(i) && !ctrl_killm2(i)
