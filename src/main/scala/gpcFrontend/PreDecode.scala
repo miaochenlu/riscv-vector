@@ -60,15 +60,7 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         val idx = addr.extract(log2Ceil(fetchWidth)+log2Ceil(coreInstBytes)-1, log2Ceil(coreInstBytes))
         ((BigInt(1) << fetchWidth)-1).U << idx
     }
-    // def instDecoder(x: UInt) = {
-    // val res = Wire(new ExpandedInstruction)
-    // res.bits := x
-    // res.rd := x(11,7)
-    // res.rs1 := x(19,15)
-    // res.rs2 := x(24,20)
-    // res.rs3 := x(31,27)
-    // res
-    // }
+
     def ExpandRVC(inst: UInt)(implicit p: Parameters): UInt = {
     val rvc_exp = Module(new RVCExpander)
         rvc_exp.io.in := inst
