@@ -572,7 +572,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ex_imm = (0 until 2) map { i => ImmGen(ex_reg_uops(i).ctrl.sel_imm, ex_reg_uops(i).inst) }
 
     val ex_wdata_ready = Wire(Vec(2, Bool()))
+    val ex_need_bypass = Wire(Vec(2, Vec(2, Bool())))
     val ex_rs_ready = Wire(Vec(2, Vec(2, Bool())))
+    ex_need_bypass(0) := VecInit.tabulate(2) { i => ex_p0_rs_byps(i)._1 }
+    ex_need_bypass(1) := VecInit.tabulate(2) { i => ex_p1_rs_byps(i)._1 }
     ex_rs_ready(0) := VecInit.tabulate(2) { i => !ex_p0_rs_byps(i)._1 || ex_p0_rs_byps(i)._2 }
     ex_rs_ready(1) := VecInit.tabulate(2) { i => !ex_p1_rs_byps(i)._1 || ex_p1_rs_byps(i)._2 }
     ex_wdata_ready(0) := ex_rs_ready(0).reduce(_ && _) && ex_reg_uops(0).ctrl.alu
@@ -755,9 +758,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       Mux(m1_p1_rs_byps(i)._2, m1_p1_rs_byps(i)._3, m1_reg_rsdata(1)(i))
     }
 
+    val m1_reg_need_bypass = RegInit(VecInit(Seq.fill(2)(VecInit(Seq.fill(2)(false.B)))))
     val m1_rs_ready = Wire(Vec(2, Vec(2, Bool())))
-    m1_rs_ready(0) := VecInit.tabulate(2) { i => m1_reg_uops(0).rs_ready(i) || !m1_p0_rs_byps(i)._1 || m1_p0_rs_byps(i)._2 }
-    m1_rs_ready(1) := VecInit.tabulate(2) { i => m1_reg_uops(1).rs_ready(i) || !m1_p1_rs_byps(i)._1 || m1_p1_rs_byps(i)._2 }
+    m1_rs_ready(0) := VecInit.tabulate(2) { i => m1_reg_uops(0).rs_ready(i) || !m1_reg_need_bypass(0)(i) || m1_p0_rs_byps(i)._2 }
+    m1_rs_ready(1) := VecInit.tabulate(2) { i => m1_reg_uops(1).rs_ready(i) || !m1_reg_need_bypass(1)(i) || m1_p1_rs_byps(i)._2 }
 
     val ex_pc_valids = Wire(Vec(2, Bool()))
     for (i <- 0 until 2) {
@@ -765,6 +769,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       when(ex_pc_valids(i)) {
         m1_reg_uops(i) := ex_reg_uops(i)
         m1_reg_uops(i).rs_ready := ex_rs_ready(i)
+        m1_reg_need_bypass(i) := ex_need_bypass(i)
         m1_reg_uops(i).wdata_ready := ex_wdata_ready(i)
         m1_reg_cause(i) := ex_cause(i)
         if (i == 0) {
@@ -856,9 +861,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     }
     val m2_imm = (0 until 2) map { i => ImmGen(m2_reg_uops(i).ctrl.sel_imm, m2_reg_uops(i).inst) }
 
+    val m2_reg_need_bypass = RegInit(VecInit(Seq.fill(2)(VecInit(Seq.fill(2)(false.B)))))
     val m2_rs_ready = Wire(Vec(2, Vec(2, Bool())))
-    m2_rs_ready(0) := VecInit.tabulate(2) { i => m2_reg_uops(0).rs_ready(i) || !m2_p0_rs_byps(i)._1 || m2_p0_rs_byps(i)._2 }
-    m2_rs_ready(1) := VecInit.tabulate(2) { i => m2_reg_uops(1).rs_ready(i) || !m2_p1_rs_byps(i)._1 || m2_p1_rs_byps(i)._2 }
+    m2_rs_ready(0) := VecInit.tabulate(2) { i => m2_reg_uops(0).rs_ready(i) || !m2_reg_need_bypass(0)(i) || m2_p0_rs_byps(i)._2 }
+    m2_rs_ready(1) := VecInit.tabulate(2) { i => m2_reg_uops(1).rs_ready(i) || !m2_reg_need_bypass(1)(i) || m2_p1_rs_byps(i)._2 }
     // To handle load-use on miss: if need bypass but not hit at all stages, replay at M2 stage.
     val replay_m2_load_use = m2_rs_ready map {
       _.asUInt =/= 3.U
@@ -919,6 +925,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       when(m1_pc_valids(i)) {
         m2_reg_uops(i) := m1_reg_uops(i)
         m2_reg_uops(i).rs_ready := m1_rs_ready(i)
+        m2_reg_need_bypass(i) := m1_reg_need_bypass(i)
         m2_reg_uops(i).wdata_ready := m1_reg_uops(i).wdata_ready
         m2_reg_cause(i) := m1_reg_cause(i)
         if (i == 0) {
@@ -981,9 +988,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val replay_m2_csr = m2_reg_valids(0) && csr.io.rw_stall
     val replay_m2 = Seq(m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay,
       m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay)
-    take_pc_m2_p0 := replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe
+    take_pc_m2_p0 := m2_reg_valids(0) && (replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe)
     val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction //TODO - sfence adding
-    val take_pc_m2_p1_others = replay_m2(1) || m2_xcpt(1)
+    val take_pc_m2_p1_others = m2_reg_valids(1) && (replay_m2(1) || m2_xcpt(1))
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
 
     when(take_pc_ex_p1) {
