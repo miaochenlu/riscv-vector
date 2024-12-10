@@ -986,8 +986,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_dcache_miss_p1 = m2_reg_uops(1).ctrl.mem && !io.dmem.resp.valid && !io.dmem.s2_nack
 
     val replay_m2_csr = m2_reg_valids(0) && csr.io.rw_stall
-    val replay_m2 = Seq(m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay,
-      m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay)
+    val replay_m2 = Seq(m2_reg_valids(0) && (m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay),
+      m2_reg_valids(1) && (m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay))
     take_pc_m2_p0 := m2_reg_valids(0) && (replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe)
     val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction //TODO - sfence adding
     val take_pc_m2_p1_others = m2_reg_valids(1) && (replay_m2(1) || m2_xcpt(1))
