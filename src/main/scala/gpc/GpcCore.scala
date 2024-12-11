@@ -797,7 +797,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         }
         m1_reg_next_pc := ex_reg_next_pc
       }
-      when(!ctrl_killx(i) && ex_wdata_ready(i)) {
+     // when(!ctrl_killx(i) && ex_wdata_ready(i)) {
+     when(!ctrl_killx(i)) {
         // Todo: add branch instrn for wdata
         m1_reg_wdata(i) := {
           if (i == 0) alu_p0.io.out else Mux(ex_jalx, ex_nl_pc, alu_p1.io.out)
@@ -1037,8 +1038,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ctrl_killm2_p0 = replay_m2(0) || !m2_reg_valids(0)
     val ctrl_killm2_p1 = replay_m2(1) || !m2_reg_valids(1)
     val ctrl_killm2 = Wire(Vec(2, Bool()))
-    ctrl_killm2(0) := Mux(!m2_reg_swap, ctrl_killm2_p0, ctrl_killm2_p0 || ctrl_killm2_p1 || m2_xcpt(1)) || vxcpt_flush
-    ctrl_killm2(1) := Mux(m2_reg_swap, ctrl_killm2_p1, ctrl_killm2_p0 || ctrl_killm2_p1 || csr.io.eret || m2_xcpt(0)) || vxcpt_flush
+    ctrl_killm2(0) := Mux(!m2_reg_swap, ctrl_killm2_p0 || m2_xcpt(0), ctrl_killm2_p0 || ctrl_killm2_p1 || m2_xcpt.reduce(_ || _)) || vxcpt_flush
+    ctrl_killm2(1) := Mux(m2_reg_swap, ctrl_killm2_p1 || m2_xcpt(1), ctrl_killm2_p0 || ctrl_killm2_p1 || csr.io.eret || m2_xcpt.reduce(_ || _)) || vxcpt_flush
     div.io.kill := ctrl_killm1(1) && RegNext(div.io.req.fire) ||
       ctrl_killm2(1) && RegNext(RegNext(div.io.req.fire))
     val m2_valids = Seq.tabulate(2)(i => m2_reg_valids(i) && !replay_m2(i) && !m2_xcpt(i))
@@ -1121,7 +1122,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     def swap_select(swap: Bool, v: Seq[Bool]): (Bool, Bool) = swap_select(swap, v(0), v(1))
 
-    val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => !ctrl_killm2(i) && m2_xcpt(i)))
+    // val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => !ctrl_killm2(i) && m2_xcpt(i)))
+    val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => m2_xcpt(i)))
 
     def m2_xcpt_data_select[T <: Data](d: Seq[T]) = Mux(m2_xcpt_select._2, d(1), d(0))
 
@@ -1583,6 +1585,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         ver_module.io.uvm_in.rob_enq(i).bits.waddr := wb_reg_waddr(i)
         ver_module.io.uvm_in.rob_enq(i).bits.wdata := Mux(wb_reg_uops(i).ctrl.wxd, wb_reg_wdata(i), fp_wdata)
         ver_module.io.uvm_in.rob_enq(i).bits.ll_ind := ll_ind(i)
+        ver_module.io.uvm_in.m2_xcpt(i) := m2_xcpt(i)
+        ver_module.io.uvm_in.m2_cause(i) := m2_cause(i)
       }
 
       dontTouch(io.verif.get)

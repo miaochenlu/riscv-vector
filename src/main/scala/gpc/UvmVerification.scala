@@ -97,6 +97,8 @@ class ROBWb(implicit p: Parameters) extends CoreBundle()(p) {
 class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val swap = Input(Bool())
   val rob_enq = Input(Vec(NRET, ValidIO(new ROBEnq)))
+  val m2_xcpt = Input(Vec(NRET, Bool()))
+  val m2_cause = Input(Vec(NRET, UInt(xLen.W)))
   //  val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
   val csr = Input(new VerInCSR)
   val ll_int_wr = Input(Bool()) // Long latency int back: int load miss for pipe0 and int div for pipe1
@@ -312,5 +314,7 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     pass := true.B
   }
 
+  io.uvm_out.trap_valid := RegNext(RegNext(io.uvm_in.m2_xcpt.reduce(_ || _)))
+  io.uvm_out.trap_code := RegNext(RegNext(Mux(io.uvm_in.m2_xcpt(0), io.uvm_in.m2_cause(0), io.uvm_in.m2_cause(1))))
   io.uvm_out.sim_halt := pass
 }
