@@ -266,6 +266,7 @@ class ReplayModule extends Module() {
     io.innerIO.bits.counter,
     totalCounter,
   )) && !(isPrefetch(io.innerIO.bits.meta.cmd) || isWriteIntent(io.innerIO.bits.meta.cmd))
+  io.toPipe.bits.nextCycleWb_sourceId := io.innerIO.bits.meta.sourceId
 
   io.toPipe.valid         := RegNext(io.toPipe.bits.nextCycleWb)
   io.toPipe.bits.regIdx   := replayMeta.regIdx

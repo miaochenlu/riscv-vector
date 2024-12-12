@@ -17,8 +17,9 @@ class MSHRWrapper(
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile()))
 
-    val nextCycleWb = Output(Bool())
-    val resp        = ValidIO(new DataExchangeResp)
+    val nextCycleWb          = Output(Bool())
+    val nextCycleWb_sourceId = Output(UInt(MasterSource.width.W))
+    val resp                 = ValidIO(new DataExchangeResp)
 
     val probeCheck    = new ProbeMSHRFile
     val probeRefill   = ValidIO(new ProbeRefill)
@@ -120,7 +121,13 @@ class MSHRWrapper(
   mshrsResp.size    := mshrs.io.toPipeline.bits.size
   mshrsResp.hasData := mshrs.io.toPipeline.valid
 
-  io.nextCycleWb        := mshrs.io.toPipeline.bits.nextCycleWb || iomshrs.io.nextCycleWb
+  io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb || iomshrs.io.nextCycleWb
+  io.nextCycleWb_sourceId := Mux(
+    mshrs.io.toPipeline.bits.nextCycleWb,
+    mshrs.io.toPipeline.bits.nextCycleWb_sourceId,
+    iomshrs.io.nextCycleWb_sourceId,
+  )
+  dontTouch(io.nextCycleWb_sourceId)
   io.resp.valid         := mshrs.io.toPipeline.valid || iomshrs.io.resp.valid
   io.resp.bits          := Mux(mshrs.io.toPipeline.valid, mshrsResp, iomshrs.io.resp.bits)
   iomshrs.io.resp.ready := !mshrs.io.toPipeline.valid

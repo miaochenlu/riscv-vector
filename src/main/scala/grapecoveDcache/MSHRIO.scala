@@ -45,7 +45,8 @@ class MSHRPipeResp extends Bundle() {
   val regData  = UInt(blockBits.W)
   val size     = UInt(log2Up(log2Up(dataBytes)).W)
 
-  val nextCycleWb = Bool()
+  val nextCycleWb          = Bool()
+  val nextCycleWb_sourceId = UInt(MasterSource.width.W)
 }
 
 class MSHRReplace extends Bundle() {
