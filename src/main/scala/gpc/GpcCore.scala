@@ -916,7 +916,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_npc_misaligned = !csr.io.status.isa('c' - 'a') && m2_npc(1)
     val m2_cfi_taken = (m2_br_ctrl.branch && m2_br_taken) || m2_br_ctrl.jalr || m2_br_ctrl.jal
     val m2_direction_misprediction = m2_br_ctrl.branch && m2_br_taken =/= m2_reg_uops(1).btb_resp.bht.taken
-    val m2_misprediction = m2_wrong_npc && !ex_misprediction_sent
+    val m2_misprediction = m2_wrong_npc
 
     val m2_alu_wdata_p1 = Mux(m2_jalx, m2_nl_pc, aluM2_p1.io.out)
 
@@ -990,13 +990,13 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val replay_m2 = Seq(m2_reg_valids(0) && (m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay),
       m2_reg_valids(1) && (m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay))
     take_pc_m2_p0 := m2_reg_valids(0) && (replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe)
-    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction //TODO - sfence adding
+    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent  //TODO - sfence adding
     val take_pc_m2_p1_others = m2_reg_valids(1) && (replay_m2(1) || m2_xcpt(1))
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
 
-    when(take_pc_ex_p1) {
+    when(take_pc_ex_p1 && !take_pc_m2) {
       ex_misprediction_sent := true.B
-    }.elsewhen(m2_reg_valids(1)) {
+    }.elsewhen(m2_reg_valids(1) && m2_misprediction) {
       ex_misprediction_sent := false.B
     }
 
