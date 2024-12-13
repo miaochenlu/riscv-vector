@@ -100,16 +100,13 @@ class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val m2_xcpt = Input(Vec(NRET, Bool()))
   val m2_cause = Input(Vec(NRET, UInt(xLen.W)))
   //  val rob_wb = Input(Vec(NRET, ValidIO(new ROBWb))) // int/fp, wb is only for long-latency instrn
+  val ll_int_wr = Input(Vec(NRET, Bool())) // Long latency int back: int load miss for pipe0 and int div for pipe1
+  val ll_int_waddr = Input(Vec(NRET, UInt(5.W)))
+  val ll_int_wdata = Input(Vec(NRET, UInt(xLen.W)))
+  val ll_fp_wr = Input(Vec(NRET, Bool())) // Long latency fp dmem for pipe0, fp fma/div/sqrt for pipe1
+  val ll_fp_waddr = Input(Vec(NRET, UInt(5.W)))
+  val ll_fp_wdata = Input(Vec(NRET, UInt(xLen.W)))
   val csr = Input(new VerInCSR)
-  val ll_int_wr = Input(Bool()) // Long latency int back: int load miss for pipe0 and int div for pipe1
-  val ll_int_waddr = Input(UInt(5.W))
-  val ll_int_wdata = Input(UInt(xLen.W))
-  val ll_fp_wr0 = Input(Bool()) // Long latency fp dmem
-  val ll_fp_waddr0 = Input(UInt(5.W))
-  val ll_fp_wdata0 = Input(UInt(xLen.W))
-  val ll_fp_wr1 = Input(Bool()) // Long latency fp fma/div/sqrt
-  val ll_fp_waddr1 = Input(UInt(5.W))
-  val ll_fp_wdata1 = Input(UInt(xLen.W))
 
   //TODO - add other signals such as csr and vector wb
 }
@@ -150,6 +147,8 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   val swapEnq = io.uvm_in.swap
   val rob_enq_swapped = Wire(Vec(2, new ROBEnq))
   val rob_enq_swapped_valid = Wire(Vec(2, Bool()))
+  val ready_to_commit_mux = Wire(Vec(2, Bool()))
+  val wdata_mux = Wire(Vec(2, UInt(xLen.W)))
   val csr_swapped = Wire(Vec(2, new(VerInCSR)))
   val old_csr = RegEnable(io.uvm_in.csr, rob_enq_swapped_valid.reduce(_ || _))
   rob_enq_swapped(0) := Mux(swapEnq, io.uvm_in.rob_enq(1).bits, io.uvm_in.rob_enq(0).bits)
@@ -160,6 +159,26 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   csr_swapped(0).minstret := io.uvm_in.csr.minstret - rob_enq_swapped_valid(1)
   csr_swapped(1) := io.uvm_in.csr
 
+  // LL comes with wb
+  for (i <- 0 until NRET) {
+    ready_to_commit_mux(i) := rob_enq_swapped_valid(i) && !rob_enq_swapped(i).ll_ind
+    wdata_mux(i) := rob_enq_swapped(i).wdata
+    for (j <- 0 until NRET) {
+      when(io.uvm_in.ll_int_wr(j)) {
+        when(rob_enq_swapped_valid(i) && rob_enq_swapped(i).int && io.uvm_in.ll_int_waddr(j) === rob_enq_swapped(i).waddr) {
+          ready_to_commit_mux(i) := true.B
+          wdata_mux(i) := io.uvm_in.ll_int_wdata(j)
+        }
+      }
+      when(io.uvm_in.ll_fp_wr(j)) {
+        when(rob_enq_swapped_valid(i) && rob_enq_swapped(i).fp && io.uvm_in.ll_fp_waddr(j) === rob_enq_swapped(i).waddr) {
+          ready_to_commit_mux(i) := true.B
+          wdata_mux(i) := io.uvm_in.ll_fp_wdata(j)
+        }
+      }
+    }
+  }
+
   when(rob_enq_swapped_valid(0)) {
     debugROB(enqPtrROB.value).valid := true.B
     debugROB(enqPtrROB.value).pc := rob_enq_swapped(0).pc
@@ -169,9 +188,9 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     debugROB(enqPtrROB.value).vec := rob_enq_swapped(0).vec
     debugROB(enqPtrROB.value).vsb_id := rob_enq_swapped(0).vsb_id
     debugROB(enqPtrROB.value).waddr := rob_enq_swapped(0).waddr
-    debugROB(enqPtrROB.value).wdata := rob_enq_swapped(0).wdata
+    debugROB(enqPtrROB.value).wdata := wdata_mux(0)
     debugROB(enqPtrROB.value).csr := csr_swapped(0)
-    debugROB(enqPtrROB.value).ready_to_commit := rob_enq_swapped_valid(0) && !rob_enq_swapped(0).ll_ind
+    debugROB(enqPtrROB.value).ready_to_commit := ready_to_commit_mux(0)
   }
   when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     debugROB((enqPtrROB + 1.U).value).valid := true.B
@@ -182,9 +201,9 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     debugROB((enqPtrROB + 1.U).value).vec := rob_enq_swapped(1).vec
     debugROB((enqPtrROB + 1.U).value).vsb_id := rob_enq_swapped(1).vsb_id
     debugROB((enqPtrROB + 1.U).value).waddr := rob_enq_swapped(1).waddr
-    debugROB((enqPtrROB + 1.U).value).wdata := rob_enq_swapped(1).wdata
+    debugROB((enqPtrROB + 1.U).value).wdata := wdata_mux(1)
     debugROB((enqPtrROB + 1.U).value).csr := csr_swapped(1)
-    debugROB((enqPtrROB + 1.U).value).ready_to_commit := rob_enq_swapped_valid(1) && !rob_enq_swapped(1).ll_ind
+    debugROB((enqPtrROB + 1.U).value).ready_to_commit := ready_to_commit_mux(1)
   }
   when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     enqPtrROB := enqPtrROB + 2.U
@@ -192,30 +211,25 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     enqPtrROB := enqPtrROB + 1.U
   }
 
-  // Wb of ROB
-  when(io.uvm_in.ll_int_wr) {
-    for (i <- 0 until ROBSize) {
-      when(debugROB(i).valid && debugROB(i).int && io.uvm_in.ll_int_waddr === debugROB(i).waddr) {
-        debugROB(i).ready_to_commit := true.B
-        debugROB(i).wdata := io.uvm_in.ll_int_wdata
+  // Wb of LL
+  for (i <- 0 until NRET) {
+    when(io.uvm_in.ll_int_wr(i)) {
+      for (j <- 0 until ROBSize) {
+        when(debugROB(j).valid && debugROB(j).int && io.uvm_in.ll_int_waddr(i) === debugROB(j).waddr) {
+          debugROB(j).ready_to_commit := true.B
+          debugROB(j).wdata := io.uvm_in.ll_int_wdata(i)
+        }
       }
     }
   }
 
-  when(io.uvm_in.ll_fp_wr0) {
-    for (i <- 0 until ROBSize) {
-      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_fp_waddr0 === debugROB(i).waddr) {
-        debugROB(i).ready_to_commit := true.B
-        debugROB(i).wdata := io.uvm_in.ll_fp_wdata0
-      }
-    }
-  }
-
-  when(io.uvm_in.ll_fp_wr1) {
-    for (i <- 0 until ROBSize) {
-      when(debugROB(i).valid && debugROB(i).fp && io.uvm_in.ll_fp_waddr1 === debugROB(i).waddr) {
-        debugROB(i).ready_to_commit := true.B
-        debugROB(i).wdata := io.uvm_in.ll_fp_wdata1
+  for (i <- 0 until NRET) {
+    when(io.uvm_in.ll_fp_wr(i)) {
+      for (j <- 0 until ROBSize) {
+        when(debugROB(j).valid && debugROB(j).fp && io.uvm_in.ll_fp_waddr(i) === debugROB(j).waddr) {
+          debugROB(j).ready_to_commit := true.B
+          debugROB(j).wdata := io.uvm_in.ll_fp_wdata(i)
+        }
       }
     }
   }

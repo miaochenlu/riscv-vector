@@ -797,8 +797,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         }
         m1_reg_next_pc := ex_reg_next_pc
       }
-     // when(!ctrl_killx(i) && ex_wdata_ready(i)) {
-     when(!ctrl_killx(i)) {
+
+      when(!ctrl_killx(i)) {
         // Todo: add branch instrn for wdata
         m1_reg_wdata(i) := {
           if (i == 0) alu_p0.io.out else Mux(ex_jalx, ex_nl_pc, alu_p1.io.out)
@@ -990,7 +990,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val replay_m2 = Seq(m2_reg_valids(0) && (m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay),
       m2_reg_valids(1) && (m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay))
     take_pc_m2_p0 := m2_reg_valids(0) && (replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe)
-    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent  //TODO - sfence adding
+    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent //TODO - sfence adding
     val take_pc_m2_p1_others = m2_reg_valids(1) && (replay_m2(1) || m2_xcpt(1))
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
 
@@ -1512,8 +1512,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     if (gpcParams.useVerif) {
 
       val ver_module = Module(new UvmVerification)
-      val ll_int_waddr = Wire(UInt(5.W))
-      val ll_int_wdata = Wire(UInt(xLen.W))
       val ll_ind = Reg(Vec(decodeWidthGpc, Bool()))
 
       val wr0_en = io.fpu.wr0_en.get
@@ -1524,16 +1522,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       val wr1_data = RegNext(io.fpu.wr1_data.get)
 
       val fp_wdata = Mux(wr0_en, wr0_data, wr1_data)
-
-      ll_int_waddr := 0.U
-      ll_int_wdata := 0.U
-      when(ll_wen_p0) {
-        ll_int_waddr := m2_waddr_p0
-        ll_int_wdata := m2_wdata_p0
-      }.elsewhen(ll_wen_p1) {
-        ll_int_waddr := m2_waddr_p1
-        ll_int_wdata := m2_wdata_p1
-      }
 
       ll_ind(0) := m2_set_busyTable_p0 && !ctrl_killm2(0)
       ll_ind(1) := m2_set_busyTable_p1 && !ctrl_killm2(1) ||
@@ -1564,16 +1552,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       ver_module.io.uvm_in.csr.vcsr := csr.io.vcsr.get
       ver_module.io.uvm_in.csr.vl := csr.io.vl.get
       ver_module.io.uvm_in.csr.vstart := csr.io.vstart.get
-      ver_module.io.uvm_in.ll_int_wr := ll_wen_p0 || ll_wen_p1
-      ver_module.io.uvm_in.ll_int_waddr := ll_int_waddr
-      ver_module.io.uvm_in.ll_int_wdata := ll_int_wdata
-      ver_module.io.uvm_in.ll_fp_wr0 := RegNext(dmem_resp_replay && dmem_resp_fpu)
-      ver_module.io.uvm_in.ll_fp_waddr0 := wr0_addr
-      ver_module.io.uvm_in.ll_fp_wdata0 := wr0_data
-      ver_module.io.uvm_in.ll_fp_wr1 := wr1_en
-      ver_module.io.uvm_in.ll_fp_waddr1 := wr1_addr // todo: vector to be added
-      ver_module.io.uvm_in.ll_fp_wdata1 := wr1_data
-
+      ver_module.io.uvm_in.ll_int_wr := ll_wen_m2
+      ver_module.io.uvm_in.ll_int_waddr := VecInit(m2_waddr_p0, m2_waddr_p1)
+      ver_module.io.uvm_in.ll_int_wdata := VecInit(m2_wdata_p0, m2_wdata_p1)
+      ver_module.io.uvm_in.ll_fp_wr := VecInit(RegNext(dmem_resp_replay && dmem_resp_fpu), wr1_en)
+      ver_module.io.uvm_in.ll_fp_waddr := VecInit(wr0_addr, wr1_addr) // todo: vector to be added
+      ver_module.io.uvm_in.ll_fp_wdata := VecInit(wr0_data, wr1_data)
       ver_module.io.uvm_in.swap := wb_reg_swap
 
       for (i <- 0 until 2) {
