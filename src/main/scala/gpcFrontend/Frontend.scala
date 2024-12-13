@@ -192,10 +192,10 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   decode_insts.io.prev_is_half := f2_prev_is_half
   decode_insts.io.prev_half_inst := f2_prev_half
 
-    when(f2_valid && fb.io.enq.ready ){
+    when(f2_valid && fb.io.enq.ready && icache.io.resp.valid){
       f2_prev_is_half := decode_insts.io.end_half.valid && !f2_correct_redirect
       f2_prev_half := decode_insts.io.end_half.bits
-    }
+  }
   
   btb.io.flush := decode_insts.io.flush 
   
