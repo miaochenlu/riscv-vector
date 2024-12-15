@@ -1458,8 +1458,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.dmem.req.bits.mask := DontCare
 
     io.dmem.asid := Mux(m2_int_dmem_req, m2_p0_rs(1), m2_p1_rs(1))
-    io.dmem.s1_data.data := Mux(m1_int_dmem_req, (if (fLen == 0) m1_reg_rsdata(0)(1) else Mux(m1_reg_uops(0).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(0)(1))),
-      (if (fLen == 0) m1_reg_rsdata(1)(1) else Mux(m1_reg_uops(1).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_reg_rsdata(1)(1))))
+    io.dmem.s1_data.data := Mux(m1_int_dmem_req, (if (fLen == 0) m1_p0_rs(1) else Mux(m1_reg_uops(0).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_p0_rs(1))),
+      (if (fLen == 0) m1_p1_rs(1) else Mux(m1_reg_uops(1).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_p1_rs(1))))
     io.dmem.s1_data.mask := DontCare
 
     io.dmem.s1_kill := Mux(m1_int_dmem_req, ctrl_killm1(0), ctrl_killm1(1)) //REVIEW
@@ -1513,6 +1513,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
       val ver_module = Module(new UvmVerification)
       val ll_ind = Reg(Vec(decodeWidthGpc, Bool()))
+      val wb_raw_inst = Wire(Vec(decodeWidthGpc, UInt(16.W)))
+      val raw_inst = Wire(Vec(decodeWidthGpc, UInt(32.W)))
 
       val wr0_en = io.fpu.wr0_en.get
       val wr0_addr = io.fpu.wr0_addr.get
@@ -1528,6 +1530,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr ||
           m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1)
 
+      wb_raw_inst(0) := RegNext(RegNext(RegNext(RegNext(io.imem.resp(0).bits.raw_inst(15, 0)))))
+      wb_raw_inst(1) := RegNext(RegNext(RegNext(RegNext(io.imem.resp(1).bits.raw_inst(15, 0)))))
+      raw_inst(0) := Cat(0.U(16.W), Mux(wb_reg_swap, wb_raw_inst(1), wb_raw_inst(0)))
+      raw_inst(1) := Cat(0.U(16.W), Mux(wb_reg_swap, wb_raw_inst(0), wb_raw_inst(1)))
       ver_module.io.uvm_in := DontCare
 
       ver_module.io.uvm_in.csr.mstatus := csr.io.status.asUInt(xLen - 1, 0)
@@ -1563,7 +1569,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       for (i <- 0 until 2) {
         ver_module.io.uvm_in.rob_enq(i).valid := wb_reg_valids(i)
         ver_module.io.uvm_in.rob_enq(i).bits.pc := wb_reg_uops(i).pc
+        ver_module.io.uvm_in.rob_enq(i).bits.rvc := wb_reg_uops(i).rvc
         ver_module.io.uvm_in.rob_enq(i).bits.insn := wb_reg_uops(i).inst
+        ver_module.io.uvm_in.rob_enq(i).bits.raw_insn := raw_inst(i)
         ver_module.io.uvm_in.rob_enq(i).bits.int := wb_reg_uops(i).ctrl.wxd
         ver_module.io.uvm_in.rob_enq(i).bits.fp := wb_reg_uops(i).wfd
         ver_module.io.uvm_in.rob_enq(i).bits.waddr := wb_reg_waddr(i)

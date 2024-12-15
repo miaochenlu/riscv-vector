@@ -78,6 +78,8 @@ class VerOutIO(implicit p: Parameters) extends CoreBundle()(p) {
 class ROBEnq(implicit p: Parameters) extends CoreBundle()(p) {
   val pc = UInt(xLen.W)
   val insn = UInt(32.W)
+  val raw_insn = UInt(32.W)
+  val rvc = Bool() // Integer
   val int = Bool() // Integer RF
   val fp = Bool() // Floating-point RF
   val vec = Bool() // Vector RF
@@ -182,7 +184,7 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   when(rob_enq_swapped_valid(0)) {
     debugROB(enqPtrROB.value).valid := true.B
     debugROB(enqPtrROB.value).pc := rob_enq_swapped(0).pc
-    debugROB(enqPtrROB.value).insn := rob_enq_swapped(0).insn
+    debugROB(enqPtrROB.value).insn := Mux(rob_enq_swapped(0).rvc, rob_enq_swapped(0).raw_insn, rob_enq_swapped(0).insn)
     debugROB(enqPtrROB.value).int := rob_enq_swapped(0).int
     debugROB(enqPtrROB.value).fp := rob_enq_swapped(0).fp
     debugROB(enqPtrROB.value).vec := rob_enq_swapped(0).vec
@@ -195,7 +197,7 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   when(rob_enq_swapped_valid(0) && rob_enq_swapped_valid(1)) {
     debugROB((enqPtrROB + 1.U).value).valid := true.B
     debugROB((enqPtrROB + 1.U).value).pc := rob_enq_swapped(1).pc
-    debugROB((enqPtrROB + 1.U).value).insn := rob_enq_swapped(1).insn
+    debugROB((enqPtrROB + 1.U).value).insn := Mux(rob_enq_swapped(1).rvc, rob_enq_swapped(1).raw_insn, rob_enq_swapped(1).insn)
     debugROB((enqPtrROB + 1.U).value).int := rob_enq_swapped(1).int
     debugROB((enqPtrROB + 1.U).value).fp := rob_enq_swapped(1).fp
     debugROB((enqPtrROB + 1.U).value).vec := rob_enq_swapped(1).vec
