@@ -218,7 +218,7 @@ class FPUCoreIO(implicit p: Parameters) extends CoreBundle()(p) {
   val wr1_en = coreParams.useVerif.option(Output(Bool()))
   val wr1_addr = coreParams.useVerif.option(Output(UInt(5.W)))
   val wr1_data = coreParams.useVerif.option(Output(UInt(64.W)))
-
+  val sfma_ind_m2 = coreParams.useVerif.option(Output(Bool()))
 }
 
 class FPUIO(implicit p: Parameters) extends FPUCoreIO ()(p) {
@@ -941,6 +941,8 @@ class FPU(cfg: FPUParams)(implicit p: Parameters) extends FPUModule()(p) {
   val mem_wen = mem_reg_valid && (mem_ctrl.fma || mem_ctrl.fastpipe || mem_ctrl.fromint)
   val write_port_busy = RegEnable(mem_wen && (memLatencyMask & latencyMask(ex_ctrl, 1)).orR || (wen & latencyMask(ex_ctrl, 0)).orR, req_valid)
   ccover(mem_reg_valid && write_port_busy, "WB_STRUCTURAL", "structural hazard on writeback")
+  io.sfma_ind_m2.get := RegNext(RegNext(req_valid && ex_ctrl.fma && ex_ctrl.typeTagOut === S))
+
 
   for (i <- 0 until maxLatency-2) {
     when (wen(i+1)) { wbInfo(i) := wbInfo(i+1) }

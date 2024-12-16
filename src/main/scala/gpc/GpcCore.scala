@@ -833,8 +833,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val dcache_kill_m1_p1 = m1_reg_valids(1) && m1_reg_uops(1).ctrl.wfd && io.dmem.replay_next // No x/fp indication, kill all
     val fpu_kill_m1 = m1_reg_valids(1) && m1_reg_uops(1).ctrl.fp && io.fpu.nack_mem
     val replay_m1 = Seq(dcache_kill_m1_p0 || m1_reg_uops(0).replay, dcache_kill_m1_p1 || fpu_kill_m1 || m1_reg_uops(1).replay)
-   // val ctrl_killm1_p0 = dcache_kill_m1_p0 || take_pc_m2 || !m1_reg_valids(0)
-   // val ctrl_killm1_p1 = dcache_kill_m1_p1 || fpu_kill_m1 || take_pc_m2 || !m1_reg_valids(1)
+    // val ctrl_killm1_p0 = dcache_kill_m1_p0 || take_pc_m2 || !m1_reg_valids(0)
+    // val ctrl_killm1_p1 = dcache_kill_m1_p1 || fpu_kill_m1 || take_pc_m2 || !m1_reg_valids(1)
     val ctrl_killm1_p0 = take_pc_m2 || !m1_reg_valids(0)
     val ctrl_killm1_p1 = take_pc_m2 || !m1_reg_valids(1)
     val ctrl_killm1 = Wire(Vec(2, Bool()))
@@ -1529,7 +1529,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
       ll_ind(0) := m2_set_busyTable_p0 && !ctrl_killm2(0)
       ll_ind(1) := m2_set_busyTable_p1 && !ctrl_killm2(1) ||
-        (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr ||
+        (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr || io.fpu.sfma_ind_m2.get ||
           m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1)
 
       wb_raw_inst(0) := RegNext(RegNext(RegNext(RegNext(io.imem.resp(0).bits.raw_inst(15, 0)))))
