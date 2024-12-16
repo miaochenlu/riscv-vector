@@ -143,7 +143,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   val f2_kill_speculative_tlb_refill = f2_speculative && !recent_progress
   val f2_correct_redirect = WireInit(false.B) 
   val f2_next_fetch = RegNext(nextFetch(f1_pc))
-  val f2_target = Mux(f2_replay,f2_pc,Mux(f2_correct_redirect,Mux(decode_insts.io.redirect_return,btb.io.ras_head.bits,decode_insts.io.predict_npc),f2_next_fetch))
+  val f2_target = Mux(f2_replay,f2_pc,Mux(f2_correct_redirect,Mux(decode_insts.io.redirect_return && btb.io.ras_head.valid,btb.io.ras_head.bits,decode_insts.io.predict_npc),f2_next_fetch))
   val f2_redirect = WireInit(false.B)
 
   //assert(!(f2_speculative && !icache.io.s2_kill))

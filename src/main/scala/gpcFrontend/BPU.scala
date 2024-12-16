@@ -548,6 +548,7 @@ class BTB(implicit p: Parameters) extends BtbModule {
     val doPeek = (btbHit & cfiType.map(_ === CFIType.ret).asUInt).orR
     io.ras_head.valid := !ras.isEmpty
     io.ras_head.bits := ras.peek
+    dontTouch(io.ras_head)
     when (!ras.isEmpty && doPeek) {
       io.resp.bits.target := ras.peek
     }
