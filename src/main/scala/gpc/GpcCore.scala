@@ -12,6 +12,7 @@ import freechips.rocketchip.rocket._
 import utility._
 import VectorParam._
 import gpc.tile._
+import Instructions._
 
 case class GpcCoreParams(
                           // Enable verificaton
@@ -1144,7 +1145,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     csr.io.decode(1).inst := id_uops(1).inst
     csr.io.exception := m2_xcpt_select._1
     csr.io.cause := m2_cause_select
-    csr.io.retire := PopCount(Seq.tabulate(2)(i => m2_valids(i) && !ctrl_killm2(i)))
+    csr.io.retire := PopCount(Seq.tabulate(2)(i => m2_valids(i) && !ctrl_killm2(i) && (m2_reg_uops(i).inst =/= ECALL) && (m2_reg_uops(i).inst =/= EBREAK)))
     csr.io.inst(0) := m2_reg_uops(0).inst // Only for trace ?
     csr.io.inst(1) := m2_reg_uops(1).inst // Only for trace ?
     csr.io.interrupts := io.interrupts

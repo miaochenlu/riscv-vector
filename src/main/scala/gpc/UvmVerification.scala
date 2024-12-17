@@ -157,8 +157,8 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   rob_enq_swapped(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).bits, io.uvm_in.rob_enq(1).bits)
   rob_enq_swapped_valid(0) := Mux(swapEnq, io.uvm_in.rob_enq(1).valid, io.uvm_in.rob_enq(0).valid)
   rob_enq_swapped_valid(1) := Mux(swapEnq, io.uvm_in.rob_enq(0).valid, io.uvm_in.rob_enq(1).valid)
-  csr_swapped(0) := Mux(swapEnq, old_csr, io.uvm_in.csr)
-  csr_swapped(0).minstret := io.uvm_in.csr.minstret - rob_enq_swapped_valid(1)
+  csr_swapped(0) := Mux(swapEnq, old_csr, io.uvm_in.csr) // ECALL/EBREAK
+  csr_swapped(0).minstret := io.uvm_in.csr.minstret - (rob_enq_swapped_valid(1) && (rob_enq_swapped(1).insn =/= 0x73.U) && (rob_enq_swapped(1).insn =/= 0x100073.U))
   csr_swapped(1) := io.uvm_in.csr
 
   // LL comes with wb
