@@ -710,14 +710,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       ex_reg_uops(i).interrupt := !take_pc_all && id_valids(i) && csr.io.interrupt
     }
 
-    val ex_replay_intrp = Seq(ex_reg_uops(0).replay || ex_reg_uops(0).interrupt,
-      ex_reg_uops(1).replay)
-    // replay inst in ex stage?
     val replay_ex_structural = Seq(ex_reg_uops(0).ctrl.mem && !io.dmem.req.ready,
       ex_reg_uops(1).ctrl.div && !div.io.req.ready || ex_reg_uops(1).ctrl.mem && !io.dmem.req.ready)
-    for (i <- 0 until 2) {
-      ex_reg_uops(i).replay := ex_reg_uops(i).replay || ex_reg_valids(i) && replay_ex_structural(i)
-    }
+    val ex_replay_intrp = Seq(ex_reg_uops(0).replay || ex_reg_uops(0).interrupt || replay_ex_structural(0),
+      ex_reg_uops(1).replay || replay_ex_structural(1))
+    // replay inst in ex stage?
+
     val ctrl_killx_p0 = take_pc_m2 || ex_reg_uops(0).replay || !ex_reg_valids(0)
     val ctrl_killx_p1 = take_pc_m2 || ex_reg_uops(1).replay || !ex_reg_valids(1)
     val ctrl_killx = Wire(Vec(2, Bool()))
@@ -806,7 +804,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         }
       }
       m1_reg_valids(i) := !ctrl_killx(i)
-      m1_reg_uops(i).replay := !take_pc_m2 && ex_reg_valids(i) && ex_reg_uops(i).replay
+
+      m1_reg_uops(i).replay := !take_pc_m2 && ex_reg_valids(i) && (ex_reg_uops(i).replay || replay_ex_structural(i))
       m1_reg_uops(i).xcpt_noIntrp := !ctrl_killx(i) && ex_xcpt(i)
       m1_reg_uops(i).interrupt := !take_pc_m2 && ex_reg_uops(i).interrupt
     }
@@ -817,8 +816,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (m1_debug_breakpoint, CSR.debugTriggerCause.U),
       (m1_breakpoint, Causes.breakpoint.U)))
 
-    val m1_replay_intrp = Seq(m1_reg_uops(0).replay || m1_reg_uops(0).interrupt,
-      m1_reg_uops(1).replay)
     val m1_xcpt_cause = (0 until 2) map { i =>
       checkExceptions(List(
         ( {
@@ -834,13 +831,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val dcache_kill_m1_p1 = m1_reg_valids(1) && m1_reg_uops(1).ctrl.wfd && io.dmem.replay_next // No x/fp indication, kill all
     val fpu_kill_m1 = m1_reg_valids(1) && m1_reg_uops(1).ctrl.fp && io.fpu.nack_mem
     val replay_m1 = Seq(dcache_kill_m1_p0 || m1_reg_uops(0).replay, dcache_kill_m1_p1 || fpu_kill_m1 || m1_reg_uops(1).replay)
-    // val ctrl_killm1_p0 = dcache_kill_m1_p0 || take_pc_m2 || !m1_reg_valids(0)
-    // val ctrl_killm1_p1 = dcache_kill_m1_p1 || fpu_kill_m1 || take_pc_m2 || !m1_reg_valids(1)
-    val ctrl_killm1_p0 = take_pc_m2 || !m1_reg_valids(0)
-    val ctrl_killm1_p1 = take_pc_m2 || !m1_reg_valids(1)
+    val ctrl_killm1_p0 = dcache_kill_m1_p0 || take_pc_m2 || !m1_reg_valids(0)
+    val ctrl_killm1_p1 = dcache_kill_m1_p1 || fpu_kill_m1 || take_pc_m2 || !m1_reg_valids(1)
     val ctrl_killm1 = Wire(Vec(2, Bool()))
     ctrl_killm1(0) := Mux(!m1_reg_swap, ctrl_killm1_p0, ctrl_killm1_p0 || ctrl_killm1_p1) || vxcpt_flush
     ctrl_killm1(1) := Mux(m1_reg_swap, ctrl_killm1_p1, ctrl_killm1_p0 || ctrl_killm1_p1 || m1_reg_flush_pipe) || vxcpt_flush
+    val m1_replay_intrp = Seq(replay_m1(0) || m1_reg_uops(0).interrupt, replay_m1(1))
 
     /** M2 stage
      */
@@ -870,10 +866,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     m2_rs_ready(0) := VecInit.tabulate(2) { i => m2_reg_uops(0).rs_ready(i) || !m2_reg_need_bypass(0)(i) || m2_p0_rs_byps(i)._2 }
     m2_rs_ready(1) := VecInit.tabulate(2) { i => m2_reg_uops(1).rs_ready(i) || !m2_reg_need_bypass(1)(i) || m2_p1_rs_byps(i)._2 }
     // To handle load-use on miss: if need bypass but not hit at all stages, replay at M2 stage.
-    val replay_m2_load_use = m2_rs_ready map {
-      _.asUInt =/= 3.U
+    //  val replay_m2_load_use = m2_rs_ready map {
+    //    _.asUInt =/= 3.U
+    //  }
+    val replay_m2_load_use = m2_rs_ready.zip(m2_reg_valids).map { case (ready, valid) =>
+      (ready.asUInt =/= 3.U) && valid
     }
-
     //---- Pipe 0 of M2 stage ----
     val m2_p0_op1 = MuxLookup(m2_reg_uops(0).ctrl.sel_alu1, 0.S)(Seq(
       A1_RS1 -> m2_p0_rs(0).asSInt,
@@ -990,11 +988,15 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_dcache_miss_p1 = m2_reg_uops(1).ctrl.mem && !io.dmem.resp.valid && !io.dmem.s2_nack
 
     val replay_m2_csr = m2_reg_valids(0) && csr.io.rw_stall
-    val replay_m2 = Seq(m2_reg_valids(0) && (m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay),
-      m2_reg_valids(1) && (m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack || replay_m2_load_use(1) || m2_reg_uops(1).replay))
-    take_pc_m2_p0 := m2_reg_valids(0) && (replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe)
+    val replay_m2_dmem_p0 = m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_nack
+    val replay_m2_dmem_p1 = m2_reg_valids(1) && m2_reg_uops(1).ctrl.mem && io.dmem.s2_nack
+
+    val replay_m2 = Seq(replay_m2_dmem_p0 || replay_m2_csr || replay_m2_load_use(0) || m2_reg_uops(0).replay,
+      replay_m2_dmem_p1 || replay_m2_load_use(1) || m2_reg_uops(1).replay)
+
+    take_pc_m2_p0 := replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe
     val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent //TODO - sfence adding
-    val take_pc_m2_p1_others = m2_reg_valids(1) && (replay_m2(1) || m2_xcpt(1))
+    val take_pc_m2_p1_others = replay_m2(1) || m2_xcpt(1)
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
 
     when(take_pc_ex_p1 && !take_pc_m2) {
@@ -1465,7 +1467,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (if (fLen == 0) m1_p1_rs(1) else Mux(m1_reg_uops(1).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_p1_rs(1))))
     io.dmem.s1_data.mask := DontCare
 
-    io.dmem.s1_kill := Mux(m1_int_dmem_req, ctrl_killm1(0), ctrl_killm1(1)) //REVIEW
+    io.dmem.s1_kill := m1_reg_valids(0) && m1_int_dmem_req && ctrl_killm1(0) || m1_reg_valids(1) && m1_fp_dmem_req && ctrl_killm1(1) //REVIEW
     io.dmem.s2_kill := false.B
     // don't let D$ go to sleep if we're probably going to use it soon
     io.dmem.keep_clock_enabled := true.B //REVIEW
