@@ -130,7 +130,7 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
         }
 
     when((!io.btb_resp.valid || !io.btb_resp.bits.bht.taken) && io.inst_mask(i) && isRet(io.inst_exp(i))){
-        redirect := true.B
+        //redirect := true.B
         io.redirect_return := true.B
         io.btb_update := true.B
         io.redirect_bridx := i.U
