@@ -143,7 +143,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   val f2_kill_speculative_tlb_refill = f2_speculative && !recent_progress
   val f2_correct_redirect = WireInit(false.B) 
   val f2_next_fetch = RegNext(nextFetch(f1_pc))
-  val f2_target = Mux(f2_replay,f2_pc,Mux(f2_correct_redirect,Mux(decode_insts.io.redirect_return && btb.io.ras_head.valid,btb.io.ras_head.bits,decode_insts.io.predict_npc),f2_next_fetch))
+  val f2_target = Mux(f2_replay,f2_pc,Mux(decode_insts.io.redirect_return && btb.io.ras_head.valid,btb.io.ras_head.bits,Mux(decode_insts.io.correct_redirect,decode_insts.io.predict_npc,f2_next_fetch)))
   val f2_redirect = WireInit(false.B)
 
   //assert(!(f2_speculative && !icache.io.s2_kill))
@@ -161,7 +161,7 @@ class FrontendModuleGpc(outer: FrontendGpc) extends LazyModuleImp(outer)
   dontTouch(fb.io.enq)
   //TODO: wether 'f2_valid && !icache.io.resp.valid' or not
   f1f2_clear := io.cpu.req.valid || f2_replay || f2_redirect
-  f2_correct_redirect := decode_insts.io.correct_redirect
+  f2_correct_redirect := decode_insts.io.correct_redirect || decode_insts.io.redirect_return
   f2_redirect := f2_replay || f2_correct_redirect //|| f1_valid && (f1_pc =/= f2_target)
   f2_valid :=  !f1f2_clear
 
