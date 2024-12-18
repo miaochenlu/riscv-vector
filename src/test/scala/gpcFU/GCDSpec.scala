@@ -1,6 +1,6 @@
 // See README.md for license details.
 
-package gcd
+package gpcFU
 
 import chisel3._
 import chisel3.experimental.BundleLiterals._
@@ -9,25 +9,28 @@ import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.must.Matchers
 
 /**
-  * This is a trivial example of how to run this Specification
-  * From within sbt use:
-  * {{{
-  * testOnly gcd.GCDSpec
-  * }}}
-  * From a terminal shell use:
-  * {{{
-  * sbt 'testOnly gcd.GCDSpec'
-  * }}}
-  * Testing from mill:
-  * {{{
-  * mill M_Chisel_Template.test.testOnly gcd.GCDSpec
-  * }}}
-  */
+ * This is a trivial example of how to run this Specification From within sbt
+ * use:
+ * {{{
+ * testOnly gcd.GCDSpec
+ * }}}
+ * From a terminal shell use:
+ * {{{
+ * sbt 'testOnly gcd.GCDSpec'
+ * }}}
+ * Testing from mill:
+ * {{{
+ * mill %NAME%.test.testOnly gcd.GCDSpec
+ * }}}
+ */
 class GCDSpec extends AnyFreeSpec with Matchers {
 
   "Gcd should calculate proper greatest common denominator" in {
     simulate(new DecoupledGcd(16)) { dut =>
-      val testValues = for { x <- 0 to 10; y <- 0 to 10} yield (x, y)
+      val testValues = for {
+        x <- 0 to 10
+        y <- 0 to 10
+      } yield (x, y)
       val inputSeq = testValues.map { case (x, y) => (new GcdInputBundle(16)).Lit(_.value1 -> x.U, _.value2 -> y.U) }
       val resultSeq = testValues.map { case (x, y) =>
         (new GcdOutputBundle(16)).Lit(_.value1 -> x.U, _.value2 -> y.U, _.gcd -> BigInt(x).gcd(BigInt(y)).U)

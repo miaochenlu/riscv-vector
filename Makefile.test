@@ -1,0 +1,2 @@
+test_GCD:
+	mill -i $(PRJ).test.testOnly $(PRJ).GCDSpec

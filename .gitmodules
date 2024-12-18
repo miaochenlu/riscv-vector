@@ -1,0 +1,3 @@
+[submodule "dependencies/rocket-chip"]
+	path = dependencies/rocket-chip
+	url = https://github.com/chipsalliance/rocket-chip
