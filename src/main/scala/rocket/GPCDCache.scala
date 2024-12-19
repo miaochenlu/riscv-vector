@@ -46,7 +46,7 @@ class GPCDCacheWrapperModule(outer: GPCDCacheWrapper) extends HellaCacheModule(o
   val dtlb = Module(new TLB(false, log2Ceil(coreDataBytes), TLBConfig(nTLBSets, nTLBWays)))
   io.ptw <> dtlb.io.ptw
 
-  dtlb.io.kill := false.B
+  dtlb.io.kill := io.cpu.s1_kill
   dtlb.io.req.valid := s0_valid && s0_readwrite
   dtlb.io.req.bits := s0_tlbReq
 
