@@ -126,19 +126,19 @@ class IOMSHRFile(
 
   val get = edge.Get(a_source, a_addr, a_size)._2
   val put = edge.Put(a_source, a_addr, a_size, a_data)._2
-  val atomic = MuxLookup(a_cmd, 0.U.asTypeOf(new TLBundleA(edge.bundle)))(
-    Seq(
-      M_XA_SWAP -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.SWAP)._2,
-      M_XA_XOR  -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.XOR)._2,
-      M_XA_OR   -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.OR)._2,
-      M_XA_AND  -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.AND)._2,
-      M_XA_ADD  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.ADD)._2,
-      M_XA_MIN  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MIN)._2,
-      M_XA_MAX  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAX)._2,
-      M_XA_MINU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MINU)._2,
-      M_XA_MAXU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAXU)._2,
-    )
-  )
+//  val atomic = MuxLookup(a_cmd, 0.U.asTypeOf(new TLBundleA(edge.bundle)))(
+//    Seq(
+//      M_XA_SWAP -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.SWAP)._2,
+//      M_XA_XOR  -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.XOR)._2,
+//      M_XA_OR   -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.OR)._2,
+//      M_XA_AND  -> edge.Logical(a_source, a_addr, a_size, a_data, TLAtomics.AND)._2,
+//      M_XA_ADD  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.ADD)._2,
+//      M_XA_MIN  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MIN)._2,
+//      M_XA_MAX  -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAX)._2,
+//      M_XA_MINU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MINU)._2,
+//      M_XA_MAXU -> edge.Arithmetic(a_source, a_addr, a_size, a_data, TLAtomics.MAXU)._2,
+//    )
+//  )
   val bypassStorePartial = edge.Put(a_source, a_addr, a_size, a_data, a_mask)._2
 
   counter := Mux(allBeatDone, 0.U, Mux(io.l2Req.fire, counter + 1.U, counter))
@@ -148,7 +148,7 @@ class IOMSHRFile(
   io.l2Req.bits := Mux(
     reqList(senderQueue.io.deq.bits).noAlloc && a_cmd === M_PWR,
     bypassStorePartial,
-    Mux(isAMO(a_cmd), atomic, Mux(isRead(a_cmd), get, put)),
+    Mux(isRead(a_cmd), get, put),
   )
 
   // refill req

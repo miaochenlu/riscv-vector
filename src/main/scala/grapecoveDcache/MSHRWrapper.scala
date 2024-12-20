@@ -47,13 +47,13 @@ class MSHRWrapper(
 //  }
 //  val muteLr = io.req.bits.cmd === M_XLR && inReplayLr && io.req.bits.paddr === inReplayLrAddr
 
-  val amoReq = isAMO(io.req.bits.cmd)
-  dontTouch(amoReq)
-  val validIOMSHRReq = (!io.cacheable || amoReq || io.req.bits.noAlloc) &&
+//  val amoReq = isAMO(io.req.bits.cmd)
+//  dontTouch(amoReq)
+  val validIOMSHRReq = (!io.cacheable || io.req.bits.noAlloc) &&
     !mshrs.io.addrMatch &&
     !iomshrs.io.addrMatch
   val validMSHRReq = Mux(
-    amoReq || !io.cacheable || iomshrs.io.addrMatch,
+    !io.cacheable || iomshrs.io.addrMatch,
     false.B,
     Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
   )

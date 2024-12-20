@@ -99,14 +99,15 @@ trait DCacheAMOTestTrait {
         dut.io.resp.bits.data.expect("h10101010".U)
         dut.io.resp.bits.status.expect(CacheRespStatus.refill)
 
+        dut.clock.step(50)
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XRD)))
 
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
 
-        dut.clock.step(1)
+//        dut.clock.step(1)
         while (!dut.io.resp.valid.peekBoolean()) {
           dut.clock.step(1)
         }

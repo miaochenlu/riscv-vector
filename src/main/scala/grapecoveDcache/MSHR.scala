@@ -5,6 +5,7 @@ import chisel3.util._
 import freechips.rocketchip.tilelink._
 import _root_.circt.stage.ChiselStage
 import freechips.rocketchip.tilelink
+import AddrDecoder._
 
 class MSHR(id: Int) extends Module() {
   val io = IO(new MSHREntryIO)
@@ -35,6 +36,8 @@ class MSHR(id: Int) extends Module() {
   val readAfterWriteFlag = RegInit(false.B)
   val trueWriteFlag      = RegInit(false.B)
   val wrwErr             = readAfterWriteFlag && isWrite(io.reqCmd)
+  val hasAmo             = RegInit(false.B)
+  val amoMergeErr        = trueWriteFlag && Mux(hasAmo, isWrite(io.reqCmd), isAMO(io.reqCmd))
   val hasLr              = RegInit(false.B)
 
   val probeState = Mux(
@@ -80,10 +83,9 @@ class MSHR(id: Int) extends Module() {
   val isFull = metaCounter === (nMSHRMetas - 1).asUInt
 //  dontTouch(isFull)
 
-  val stallReq =
-    allocLineAddrMatch && (!(state <= mode_resp_wait) || isFull || privErr || wrwErr || succLrReq) && !isPrefetch(
-      io.reqCmd
-    )
+  val stallReq = allocLineAddrMatch &&
+    (!(state <= mode_resp_wait) || isFull || privErr || wrwErr || succLrReq || amoMergeErr) &&
+    !isPrefetch(io.reqCmd)
   io.stallReq := stallReq
   io.isEmpty  := state === mode_idle
 
@@ -100,15 +102,18 @@ class MSHR(id: Int) extends Module() {
   when(state === mode_clear) {
     metaCounter   := 0.U
     trueWriteFlag := false.B
+    hasAmo        := false.B
   }.elsewhen(allocateReq && !stallReq) {
     when(state === mode_idle) {
       metaCounter   := 1.U
       trueWriteFlag := io.isUpgrade || isWrite(io.reqCmd)
+      hasAmo        := isAMO(io.reqCmd)
     }.elsewhen(allocLineAddrMatch && !isPrefetch(io.reqCmd)) {
       when(!trueWriteFlag && isWrite(io.reqCmd)) {
         trueWriteFlag := true.B
         metaCounter   := metaCounter + 1.U
-      }.elsewhen(isRead(io.reqCmd)) {
+        hasAmo        := hasAmo | isAMO(io.reqCmd)
+      }.elsewhen(isRead(io.reqCmd) && !isAMO(io.reqCmd)) {
         metaCounter := metaCounter + 1.U
       }
     }
@@ -211,6 +216,24 @@ class ReplayModule extends Module() {
     res.asUInt
   }
 
+  // ========== processing amo req ==========
+  val amoalu = Module(new AMOALU(XLEN))
+  val amo_dataVec = VecInit(
+    (0 until nBanks).map(i => replayReg((i + 1) * rowBits - 1, i * rowBits))
+  )
+  val amo_bankOffset = getBankIdx(replayMeta.offset)
+
+  amoalu.io.mask := new StoreGen(replayMeta.size, replayMeta.offset, 0.U, XLEN / 8).mask // XLEN mask
+  amoalu.io.cmd  := replayMeta.cmd
+  amoalu.io.lhs  := amo_dataVec(amo_bankOffset)                                          // origin data
+  amoalu.io.rhs  := io.innerIO.bits.data                                                 // new data
+
+  val amoStoreDataVec = VecInit(
+    (0 until nBanks).map(i => 0.U(64.W))
+  )
+  amoStoreDataVec(amo_bankOffset) := amoalu.io.out
+  // ========== end of amo req process ==========
+
   metaCounter := MuxCase(
     metaCounter,
     Seq(
@@ -224,7 +247,11 @@ class ReplayModule extends Module() {
     Seq(
       initEnable -> io.innerIO.bits.data,
       ((state === mode_replay) && isWrite(replayMeta.cmd)) ->
-        maskedStoreGen(io.innerIO.bits.mask, replayReg, io.innerIO.bits.data),
+        maskedStoreGen(
+          io.innerIO.bits.mask,
+          replayReg,
+          Mux(isAMO(replayMeta.cmd), amoStoreDataVec.asUInt, io.innerIO.bits.data),
+        ),
     ),
   )
 
@@ -265,7 +292,8 @@ class ReplayModule extends Module() {
     state === mode_idle,
     io.innerIO.bits.counter,
     totalCounter,
-  )) && !(isPrefetch(io.innerIO.bits.meta.cmd) || isWriteIntent(io.innerIO.bits.meta.cmd))
+  )) && !(isPrefetch(io.innerIO.bits.meta.cmd) ||
+    (isWriteIntent(io.innerIO.bits.meta.cmd) && !isAMO(io.innerIO.bits.meta.cmd)))
   io.toPipe.bits.nextCycleWb_sourceId := io.innerIO.bits.meta.sourceId
 
   io.toPipe.valid         := RegNext(io.toPipe.bits.nextCycleWb)
@@ -486,7 +514,7 @@ class MSHRFile extends Module() {
   when(dataArrayWriteEna) {
 //    dataArrayWriteEna := false.B
     dataArray(dataArrayWriteIdx) := Mux(
-      RegNext(io.pipelineReq.bits.isUpgrade),
+      RegNext(io.pipelineReq.bits.isUpgrade || isAMO(io.pipelineReq.bits.meta.cmd)),
       io.pipelineReq.bits.data,
       dataMergeGen(~io.pipelineReq.bits.mask, dataArray(dataArrayWriteIdx)) |
         dataMergeGen(io.pipelineReq.bits.mask, io.pipelineReq.bits.data),
