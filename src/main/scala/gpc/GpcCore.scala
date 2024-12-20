@@ -1043,7 +1043,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ctrl_killm2_p0 = replay_m2(0) || !m2_reg_valids(0)
     val ctrl_killm2_p1 = replay_m2(1) || !m2_reg_valids(1)
     val ctrl_killm2 = Wire(Vec(2, Bool()))
-    ctrl_killm2(0) := Mux(!m2_reg_swap, ctrl_killm2_p0 || m2_xcpt(0), ctrl_killm2_p0 || ctrl_killm2_p1 || m2_xcpt.reduce(_ || _)) || vxcpt_flush
+    ctrl_killm2(0) := Mux(!m2_reg_swap, ctrl_killm2_p0 || m2_xcpt(0), ctrl_killm2_p0 || ctrl_killm2_p1 || take_pc_m2_cfi || m2_xcpt.reduce(_ || _)) || vxcpt_flush
     ctrl_killm2(1) := Mux(m2_reg_swap, ctrl_killm2_p1 || m2_xcpt(1), ctrl_killm2_p0 || ctrl_killm2_p1 || csr.io.eret || m2_xcpt.reduce(_ || _)) || vxcpt_flush
     div.io.kill := ctrl_killm1(1) && RegNext(div.io.req.fire) ||
       ctrl_killm2(1) && RegNext(RegNext(div.io.req.fire))
