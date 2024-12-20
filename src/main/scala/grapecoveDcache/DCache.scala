@@ -431,19 +431,21 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr get store data in s2
-  val s2_upgradePermMiss      = RegNext(s1_upgradePermMiss)
-  val s2_mshrStoreData        = Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata)
+  val s2_upgradePermMiss = RegNext(s1_upgradePermMiss)
+  val s2_mshrStoreData   = Mux(isAMO(s2_req.cmd), s2_data, Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata))
   val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
 
-  val mshrReq = WireDefault(s1_req)
-  mshrReq.wdata   := s2_mshrStoreData
-  mshrReq.wmask   := s2_mshrStoreMaskInBytes
-  mshrReq.noAlloc := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
+  val mshrReq = WireDefault(s1_req.asTypeOf(new MSHRWrapperPipeReq(edge.bundle)))
+
+  mshrReq.noAlloc   := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
+  mshrReq.cacheable := s1_cacheable
+  mshrReq.isUpgrade := s1_upgradePermMiss
+  mshrReq.amoData   := s2_storeData
+  mshrReq.wdata     := s2_mshrStoreData
+  mshrReq.wmask     := s2_mshrStoreMaskInBytes
 
   mshrs.io.req.valid := s1_mshrAlloc
   mshrs.io.req.bits  := mshrReq
-  mshrs.io.isUpgrade := s1_upgradePermMiss
-  mshrs.io.cacheable := s1_cacheable
 
   // mshr acquire block or perm from L2
   tlBus.a <> mshrs.io.l2Req

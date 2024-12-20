@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.util._
 import util._
 import freechips.rocketchip.tilelink._
+import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.tilelink._
 
 /////// MSHR Entry IO
 class MSHREntryIO extends Bundle() {
@@ -36,6 +38,12 @@ class MSHREntryIO extends Bundle() {
   val probeLineAddrMatch = Output(Bool())
   val probePermission    = Input(UInt(TLPermissions.bdWidth.W))
   val probeState         = Output(UInt(ProbeMSHRState.width.W))
+}
+
+class MSHRWrapperPipeReq(params: TLBundleParameters) extends MainPipeReq(params) {
+  val amoData   = UInt(XLEN.W)
+  val cacheable = Bool()
+  val isUpgrade = Bool()
 }
 
 /////// replay reg IOs

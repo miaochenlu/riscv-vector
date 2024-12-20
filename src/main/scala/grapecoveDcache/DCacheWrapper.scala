@@ -19,7 +19,7 @@ class DCacheWrapper(isTest: Boolean)(
   else { AddressSet(0x0, 0x7f_ffff_ffffL).subtract(uncacheableRange) }
 
   val mmio = LazyModule(new TLRAM(mmioRange, beatBytes = beatBytes, atomics = true))
-  val rams = ramRange.map(x => LazyModule(new TLRAM(x, beatBytes = beatBytes, atomics = true)))
+  val rams = ramRange.map(x => LazyModule(new TLRAM(x, beatBytes = beatBytes, atomics = false)))
 
   val xbar = TLXbar()
   mmio.node := xbar

@@ -10,9 +10,7 @@ class MSHRWrapper(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
-    val cacheable = Input(Bool())
-    val isUpgrade = Input(Bool())
+    val req = Flipped(DecoupledIO(new MSHRWrapperPipeReq(edge.bundle)))
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile()))
@@ -49,18 +47,18 @@ class MSHRWrapper(
 
 //  val amoReq = isAMO(io.req.bits.cmd)
 //  dontTouch(amoReq)
-  val validIOMSHRReq = (!io.cacheable || io.req.bits.noAlloc) &&
+  val validIOMSHRReq = (!io.req.bits.cacheable || io.req.bits.noAlloc) &&
     !mshrs.io.addrMatch &&
     !iomshrs.io.addrMatch
   val validMSHRReq = Mux(
-    !io.cacheable || iomshrs.io.addrMatch,
+    !io.req.bits.cacheable || iomshrs.io.addrMatch,
     false.B,
     Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
   )
 
   // req signal connect
   mshrs.io.pipelineReq.valid              := io.req.valid && validMSHRReq
-  mshrs.io.pipelineReq.bits.isUpgrade     := io.isUpgrade
+  mshrs.io.pipelineReq.bits.isUpgrade     := io.req.bits.isUpgrade
   mshrs.io.pipelineReq.bits.data          := io.req.bits.wdata
   mshrs.io.pipelineReq.bits.mask          := io.req.bits.wmask
   mshrs.io.pipelineReq.bits.lineAddr      := AddrDecoder.getLineAddr(io.req.bits.paddr)
