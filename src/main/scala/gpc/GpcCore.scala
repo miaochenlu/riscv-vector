@@ -342,8 +342,9 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     //----  Uop 0 ----
     val data_hazard_ex_uop0_p0 = ex_ctrls(0).wxd && checkHazards(hazard_targets(0), _ === ex_reg_uops(0).rd)
     val data_hazard_ex_uop0_p1 = ex_ctrls(1).wxd && checkHazards(hazard_targets(0), _ === ex_reg_uops(1).rd)
-    val ex_cannot_bypass_p0 = ex_ctrls(0).csr =/= CSR.N || ex_ctrls(0).mem
-    val ex_cannot_bypass_p1 = ex_ctrls(1).div || ex_ctrls(1).fp || ex_ctrls(1).mul
+    // ALU(m2) can't bypass to store(store data m1)
+    val ex_cannot_bypass_p0 = ex_ctrls(0).csr =/= CSR.N || ex_ctrls(0).mem || ex_ctrls(0).alu && id_ctrls(0).mem && (id_ctrls(0).mem_cmd === M_XWR)
+    val ex_cannot_bypass_p1 = ex_ctrls(1).div || ex_ctrls(1).fp || ex_ctrls(1).mul || ex_ctrls(1).alu && id_ctrls(0).mem && (id_ctrls(0).mem_cmd === M_XWR)
     val ex_can_bypass_uop0_p0 = ex_ctrls(0).mem && id_ctrls(0).alu
     val ex_can_bypass_uop0_p1 = ex_ctrls(1).mul && id_ctrls(0).alu
     // Using "||" is sufficient, because results of two pipes on the same stage cannot have WAW.
