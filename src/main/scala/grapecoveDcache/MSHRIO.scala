@@ -40,11 +40,11 @@ class MSHREntryIO extends Bundle() {
   val probeState         = Output(UInt(ProbeMSHRState.width.W))
 }
 
-class MSHRWrapperPipeReq(params: TLBundleParameters) extends MainPipeReq(params) {
-  val amoData   = UInt(XLEN.W)
-  val cacheable = Bool()
-  val isUpgrade = Bool()
-}
+//class MSHRWrapperPipeReq(params: TLBundleParameters) extends MainPipeReq(params) {
+//  val amoData   = UInt(XLEN.W)
+//  val cacheable = Bool()
+//  val isUpgrade = Bool()
+//}
 
 /////// replay reg IOs
 class MSHRPipeResp extends Bundle() {
@@ -67,9 +67,10 @@ class MSHRInner extends Bundle() {
   val perm     = UInt(TLPermissions.bdWidth.W)
   val lineAddr = UInt(lineAddrWidth.W)
 
-  val meta = new ReqMetaBundle() // current tick read meta array
-  val mask = UInt(blockBytes.W)
-  val data = UInt(blockBits.W)
+  val meta    = new ReqMetaBundle() // current tick read meta array
+  val mask    = UInt(blockBytes.W)
+  val data    = UInt(blockBits.W)
+  val amoData = UInt(XLEN.W)
 
   val entryIdx = UInt(log2Up(nMSHRs).W) // init replay reg, set read meta array base addr
   val counter  = UInt(log2Up(nMSHRMetas).W)
@@ -105,6 +106,7 @@ class CachepipeMSHRFile extends Bundle() {
   val lineAddr  = UInt(lineAddrWidth.W)
   val meta      = new ReqMetaBundle
   val mask      = UInt(blockBytes.W)
+  val amoData   = UInt(XLEN.W)
   val data      = UInt(blockBits.W)
 }
 

@@ -308,11 +308,13 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_tag        = RegEnable(s1_tag, s1_needUpdate)
   val s2_data       = RegEnable(s1_data, s1_needUpdate)
   val s2_req        = RegInit(0.U.asTypeOf(new MainPipeReq(edge.bundle)))
+  val s2_amoMiss    = RegInit(false.B)
   // need to calculate hit store data & miss store data
   when(s1_needUpdate | (s1_mshrAlloc && isWrite(s1_req.cmd))) {
     s2_req       := s1_req
     s2_req.wdata := s1_newStoreData
     s2_req.wmask := s1_newStoreMask
+    s2_amoMiss   := isAMO(s1_req.cmd) && (s1_amoNoPermMiss || s1_noDataMiss)
   }
 
   // * cpu store data
@@ -337,7 +339,11 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   amoalu.io.lhs  := s2_dataVec(s2_bankOffset)
   amoalu.io.rhs  := s2_req.wdata
 
-  val s2_storeData = Mux(isAMO(s2_req.cmd), s2_amoStoreData, s2_mergeStoreData)
+  val s2_storeData = Mux(
+    isAMO(s2_req.cmd),
+    Mux(s2_amoMiss, s2_req.wdata, s2_amoStoreData),
+    s2_mergeStoreData,
+  )
   // * pipeline stage 2 End
 
   // * pipeline stage 3 Begin
@@ -435,17 +441,18 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_mshrStoreData   = Mux(isAMO(s2_req.cmd), s2_data, Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata))
   val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
 
-  val mshrReq = WireDefault(s1_req.asTypeOf(new MSHRWrapperPipeReq(edge.bundle)))
+  val mshrReq = WireDefault(s1_req)
 
-  mshrReq.noAlloc   := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
-  mshrReq.cacheable := s1_cacheable
-  mshrReq.isUpgrade := s1_upgradePermMiss
-  mshrReq.amoData   := s2_storeData
-  mshrReq.wdata     := s2_mshrStoreData
-  mshrReq.wmask     := s2_mshrStoreMaskInBytes
+  mshrReq.noAlloc := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
+  mshrReq.wdata   := s2_mshrStoreData
+  mshrReq.wmask   := s2_mshrStoreMaskInBytes
 
   mshrs.io.req.valid := s1_mshrAlloc
   mshrs.io.req.bits  := mshrReq
+
+  mshrs.io.cacheable := s1_cacheable
+  mshrs.io.isUpgrade := s1_upgradePermMiss
+  mshrs.io.amoData   := s2_storeData
 
   // mshr acquire block or perm from L2
   tlBus.a <> mshrs.io.l2Req

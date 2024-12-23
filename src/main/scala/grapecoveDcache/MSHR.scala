@@ -226,7 +226,7 @@ class ReplayModule extends Module() {
   amoalu.io.mask := new StoreGen(replayMeta.size, replayMeta.offset, 0.U, XLEN / 8).mask // XLEN mask
   amoalu.io.cmd  := replayMeta.cmd
   amoalu.io.lhs  := amo_dataVec(amo_bankOffset)                                          // origin data
-  amoalu.io.rhs  := io.innerIO.bits.data                                                 // new data
+  amoalu.io.rhs  := io.innerIO.bits.amoData                                              // new data
 
   val amoStoreDataVec = VecInit(
     (0 until nBanks).map(i => 0.U(64.W))
@@ -340,6 +340,12 @@ class MSHRFile extends Module() {
   val dataArray = RegInit(
     VecInit(
       Seq.fill(nMSHRs)(0.U(blockBits.W))
+    )
+  )
+
+  val amoDataArray = RegInit(
+    VecInit(
+      Seq.fill(nMSHRs)(0.U(XLEN.W))
     )
   )
 
@@ -491,16 +497,20 @@ class MSHRFile extends Module() {
   val dataArrayWriteEna = RegInit(false.B)
   val dataArrayWriteIdx = RegInit(0.U(nMSHRs.W))
 
+  val amoDataArrayWriteEna = RegInit(false.B)
+
   when(io.pipelineReq.fire && Mux(lineAddrMatch, !isPrefetch(io.pipelineReq.bits.meta.cmd), true.B)) {
     // read/write => update meta info
     metaArray(wrIdx)(metaWriteIdx) := io.pipelineReq.bits.meta.asUInt
 
     // write => update data array & mask array
     when(isWrite(io.pipelineReq.bits.meta.cmd)) {
-      dataArrayWriteEna := true.B
-      dataArrayWriteIdx := wrIdx
+      dataArrayWriteEna    := true.B
+      dataArrayWriteIdx    := wrIdx
+      amoDataArrayWriteEna := isAMO(io.pipelineReq.bits.meta.cmd)
     }.otherwise {
-      dataArrayWriteEna := false.B
+      dataArrayWriteEna    := false.B
+      amoDataArrayWriteEna := false.B
     }
   }.elsewhen(io.replaceStatus === ReplaceStatus.replace_finish) {
     maskArray(replayReg.io.replayIdx) := 0.U
@@ -520,6 +530,10 @@ class MSHRFile extends Module() {
         dataMergeGen(io.pipelineReq.bits.mask, io.pipelineReq.bits.data),
     )
     maskArray(dataArrayWriteIdx) := io.pipelineReq.bits.mask | maskArray(dataArrayWriteIdx)
+  }
+
+  when(amoDataArrayWriteEna) {
+    amoDataArray(dataArrayWriteIdx) := io.pipelineReq.bits.amoData
   }
 
   // sender queue
@@ -558,6 +572,7 @@ class MSHRFile extends Module() {
     ),
     dataArray(replayReg.io.replayIdx),
   )
+  replayReg.io.innerIO.bits.amoData := amoDataArray(replayReg.io.replayIdx)
   replayReg.io.innerIO.bits.counter := replayCounterList(replayReg.io.replayIdx)
 
   io.toPipeline <> replayReg.io.toPipe
