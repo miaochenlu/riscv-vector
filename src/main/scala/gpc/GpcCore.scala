@@ -836,7 +836,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ctrl_killm1_p1 = dcache_kill_m1_p1 || fpu_kill_m1 || take_pc_m2 || !m1_reg_valids(1)
     val ctrl_killm1 = Wire(Vec(2, Bool()))
     ctrl_killm1(0) := Mux(!m1_reg_swap, ctrl_killm1_p0, ctrl_killm1_p0 || ctrl_killm1_p1) || vxcpt_flush
-    ctrl_killm1(1) := Mux(m1_reg_swap, ctrl_killm1_p1, ctrl_killm1_p0 || ctrl_killm1_p1 || m1_reg_flush_pipe) || vxcpt_flush
+    ctrl_killm1(1) := Mux(m1_reg_swap, ctrl_killm1_p1, ctrl_killm1_p0 || ctrl_killm1_p1) || vxcpt_flush
     val m1_replay_intrp = Seq(replay_m1(0) || m1_reg_uops(0).interrupt, replay_m1(1))
 
     /** M2 stage
@@ -982,7 +982,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ma.st, Causes.misaligned_store.U),
       (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ma.ld, Causes.misaligned_load.U)
     ))
-    val m2_xcpt = Seq(m2_xcpt_cause_p0._1, m2_reg_xcpt(1))
+
+    val m2_xcpt = Seq(m2_xcpt_cause_p0._1, Mux(m2_reg_swap, m2_reg_xcpt(1), m2_reg_xcpt(1) && !m2_reg_flush_pipe))
     val m2_cause = Seq(m2_xcpt_cause_p0._2, m2_reg_cause(1))
 
     val m2_dcache_miss_p0 = m2_reg_uops(0).ctrl.mem && !io.dmem.resp.valid && !io.dmem.s2_nack
@@ -1045,7 +1046,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ctrl_killm2_p1 = replay_m2(1) || !m2_reg_valids(1)
     val ctrl_killm2 = Wire(Vec(2, Bool()))
     ctrl_killm2(0) := Mux(!m2_reg_swap, ctrl_killm2_p0 || m2_xcpt(0), ctrl_killm2_p0 || ctrl_killm2_p1 || take_pc_m2_cfi || m2_xcpt.reduce(_ || _)) || vxcpt_flush
-    ctrl_killm2(1) := Mux(m2_reg_swap, ctrl_killm2_p1 || m2_xcpt(1), ctrl_killm2_p0 || ctrl_killm2_p1 || csr.io.eret || m2_xcpt.reduce(_ || _)) || vxcpt_flush
+    ctrl_killm2(1) := Mux(m2_reg_swap, ctrl_killm2_p1 || m2_xcpt(1), ctrl_killm2_p0 || ctrl_killm2_p1 || csr.io.eret || m2_xcpt.reduce(_ || _) || m2_reg_flush_pipe) || vxcpt_flush
     div.io.kill := ctrl_killm1(1) && RegNext(div.io.req.fire) ||
       ctrl_killm2(1) && RegNext(RegNext(div.io.req.fire))
     val m2_valids = Seq.tabulate(2)(i => m2_reg_valids(i) && !replay_m2(i) && !m2_xcpt(i))
