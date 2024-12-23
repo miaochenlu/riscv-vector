@@ -10,10 +10,7 @@ class MSHRWrapper(
     implicit edge: TLEdgeOut
 ) extends Module {
   val io = IO(new Bundle {
-    val req       = Flipped(DecoupledIO(new MainPipeReq(edge.bundle)))
-    val amoData   = Input(UInt(XLEN.W))
-    val cacheable = Input(Bool())
-    val isUpgrade = Input(Bool())
+    val req = Flipped(DecoupledIO(new MSHRWrapperPipeReq(edge.bundle)))
 
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile()))
@@ -33,37 +30,20 @@ class MSHRWrapper(
   val mshrs   = Module(new MSHRFile())
   val iomshrs = Module(new IOMSHRFile())
 
-//  val inReplayLr     = RegInit(false.B)
-//  val inReplayLrAddr = RegInit(0.U(paddrWidth.W))
-//  when(io.req.valid) {
-//    when(inReplayLr && io.req.bits.cmd =/= M_XLR) {
-//      inReplayLr     := false.B
-//      inReplayLrAddr := 0.U
-//    }.elsewhen(inReplayLr && io.req.bits.paddr =/= inReplayLrAddr) {
-//      inReplayLrAddr := io.req.bits.paddr
-//    }.elsewhen(!inReplayLr && io.req.bits.cmd === M_XLR) {
-//      inReplayLr     := true.B
-//      inReplayLrAddr := io.req.bits.paddr
-//    }
-//  }
-//  val muteLr = io.req.bits.cmd === M_XLR && inReplayLr && io.req.bits.paddr === inReplayLrAddr
-
-//  val amoReq = isAMO(io.req.bits.cmd)
-//  dontTouch(amoReq)
-  val validIOMSHRReq = (!io.cacheable || io.req.bits.noAlloc) &&
+  val validIOMSHRReq = (!io.req.bits.cacheable || io.req.bits.noAlloc) &&
     !mshrs.io.addrMatch &&
     !iomshrs.io.addrMatch
   val validMSHRReq = Mux(
-    !io.cacheable || iomshrs.io.addrMatch,
+    !io.req.bits.cacheable || iomshrs.io.addrMatch,
     false.B,
     Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
   )
 
   // req signal connect
   mshrs.io.pipelineReq.valid              := io.req.valid && validMSHRReq
-  mshrs.io.pipelineReq.bits.isUpgrade     := io.isUpgrade
+  mshrs.io.pipelineReq.bits.isUpgrade     := io.req.bits.isUpgrade
   mshrs.io.pipelineReq.bits.data          := io.req.bits.wdata
-  mshrs.io.pipelineReq.bits.amoData       := io.amoData
+  mshrs.io.pipelineReq.bits.amoData       := io.req.bits.amoData
   mshrs.io.pipelineReq.bits.mask          := io.req.bits.wmask
   mshrs.io.pipelineReq.bits.lineAddr      := AddrDecoder.getLineAddr(io.req.bits.paddr)
   mshrs.io.pipelineReq.bits.meta.sourceId := io.req.bits.source

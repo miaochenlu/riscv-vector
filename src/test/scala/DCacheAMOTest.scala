@@ -106,16 +106,8 @@ trait DCacheAMOTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.bits.status.expect(CacheRespStatus.hit)
-
-//        dut.clock.step(1)
-//        while (!dut.io.resp.valid.peekBoolean()) {
-//          dut.clock.step(1)
-//        }
-//
-//        dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
         dut.io.resp.bits.data.expect(0x7890.U)
-//        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
         dut.clock.step(10)
       }
     }
@@ -330,7 +322,7 @@ trait DCacheAMOTestTrait {
           size = 3,
         )
 
-        // first -> no perm miss replay
+        // first -> no perm miss
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(
           wdata = "h0101010101010101",
@@ -340,11 +332,11 @@ trait DCacheAMOTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.replay)
+        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
 
         dut.clock.step(20)
 
-        // second -> iomshr
+        // second req hit
         dut.io.req.valid.poke(true.B)
         dut.io.req.bits.poke(genReq(cacheReq.copy(
           wdata = "h0101010101010101",
@@ -354,32 +346,9 @@ trait DCacheAMOTestTrait {
         dut.clock.step(1)
         dut.io.req.valid.poke(false.B)
         dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
+        dut.io.resp.bits.status.expect(CacheRespStatus.hit)
+        dut.io.resp.bits.data.expect("h2424242424242424".U)
 
-        dut.clock.step(1)
-        while (!dut.io.resp.valid.peekBoolean()) {
-          dut.clock.step(1)
-        }
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h0".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
-
-        // read miss
-        dut.io.req.valid.poke(true.B)
-        dut.io.req.bits.poke(genReq(cacheReq.copy(cmd = M_XRD)))
-
-        dut.clock.step(1)
-        dut.io.req.valid.poke(false.B)
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.status.expect(CacheRespStatus.miss)
-
-        dut.clock.step(1)
-        while (!dut.io.resp.valid.peekBoolean()) {
-          dut.clock.step(1)
-        }
-        dut.io.resp.valid.expect(true.B)
-        dut.io.resp.bits.data.expect("h0101010101010101".U)
-        dut.io.resp.bits.status.expect(CacheRespStatus.refill)
         dut.clock.step(10)
       }
     }

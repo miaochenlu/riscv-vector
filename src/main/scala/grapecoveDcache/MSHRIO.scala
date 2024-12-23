@@ -40,11 +40,11 @@ class MSHREntryIO extends Bundle() {
   val probeState         = Output(UInt(ProbeMSHRState.width.W))
 }
 
-//class MSHRWrapperPipeReq(params: TLBundleParameters) extends MainPipeReq(params) {
-//  val amoData   = UInt(XLEN.W)
-//  val cacheable = Bool()
-//  val isUpgrade = Bool()
-//}
+class MSHRWrapperPipeReq(params: TLBundleParameters) extends MainPipeReq(params) {
+  val amoData   = UInt(XLEN.W)
+  val cacheable = Bool()
+  val isUpgrade = Bool()
+}
 
 /////// replay reg IOs
 class MSHRPipeResp extends Bundle() {

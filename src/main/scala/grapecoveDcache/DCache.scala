@@ -8,6 +8,7 @@ import freechips.rocketchip.tilelink._
 import utility._
 import AddrDecoder._
 import MemoryOpConstants._
+import chisel3.experimental.DataMirror
 
 class GPCDCache()(
     implicit p: Parameters
@@ -193,12 +194,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // TODO: PWR assertion
   // TODO: Merge Store & AMO Store
 
-  // * amo no perm miss
-  val s1_amoNoPermMiss   = s1_validFromCore && isAMO(s1_req.cmd) && s1_upgradePermMiss
-  val s1_amoNoPermWb     = s1_amoNoPermMiss
-  val s1_amoNoPermWbData = false.B
-  val s1_amoShrinkParam  = TLPermissions.BtoN
-
   // * cpu lrsc
   // NOTE: when lrscValid -> block probe & replace to lrscAddr
   val lrscCount      = RegInit(0.U)
@@ -227,11 +222,8 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeHitUpdateMeta = s1_validFromCore && s1_cacheable && s1_upgradePermHit && !s1_scFail
-  val s1_storeMissUpdateMeta = s1_validFromCore && s1_cacheable && (
-    (s1_amoNoPermMiss && wbPipeReq.ready) ||
-      (s1_upgradePermMiss && !isAMO(s1_req.cmd) && mshrs.io.req.ready)
-  )
+  val s1_storeHitUpdateMeta  = s1_validFromCore && s1_cacheable && s1_upgradePermHit && !s1_scFail
+  val s1_storeMissUpdateMeta = s1_validFromCore && s1_cacheable && (s1_upgradePermMiss && mshrs.io.req.ready)
 
   val s1_storeUpdateData = s1_validFromCore && s1_cacheable && s1_hit &&
     isWrite(s1_req.cmd) && !s1_scFail
@@ -314,7 +306,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     s2_req       := s1_req
     s2_req.wdata := s1_newStoreData
     s2_req.wmask := s1_newStoreMask
-    s2_amoMiss   := isAMO(s1_req.cmd) && (s1_amoNoPermMiss || s1_noDataMiss)
+    s2_amoMiss   := isAMO(s1_req.cmd) && (s1_upgradePermMiss || s1_noDataMiss)
   }
 
   // * cpu store data
@@ -433,7 +425,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   dontTouch(mshrs.io)
 
   // pipeline miss -> mshr
-  s1_mshrAlloc := s1_validFromCore && ~s1_scFail && (~s1_hit && ~s1_amoNoPermMiss) && ~s1_wbqBlockMiss
+  s1_mshrAlloc := s1_validFromCore && ~s1_scFail && ~s1_hit && ~s1_wbqBlockMiss
   val s1_mshrAllocFail = s1_mshrAlloc && !mshrs.io.req.ready
 
   // mshr get store data in s2
@@ -441,18 +433,17 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s2_mshrStoreData   = Mux(isAMO(s2_req.cmd), s2_data, Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata))
   val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
 
-  val mshrReq = WireDefault(s1_req)
-
-  mshrReq.noAlloc := Mux(s1_upgradePermMiss, false.B, s1_req.noAlloc)
-  mshrReq.wdata   := s2_mshrStoreData
-  mshrReq.wmask   := s2_mshrStoreMaskInBytes
-
   mshrs.io.req.valid := s1_mshrAlloc
-  mshrs.io.req.bits  := mshrReq
 
-  mshrs.io.cacheable := s1_cacheable
-  mshrs.io.isUpgrade := s1_upgradePermMiss
-  mshrs.io.amoData   := s2_storeData
+  for ((name, value) <- s1_req.elements) {
+    mshrs.io.req.bits.elements(name) := value
+  }
+  mshrs.io.req.bits.noAlloc   := (!s1_upgradePermMiss) & s1_req.noAlloc
+  mshrs.io.req.bits.cacheable := s1_cacheable
+  mshrs.io.req.bits.isUpgrade := s1_upgradePermMiss
+  mshrs.io.req.bits.amoData   := s2_storeData
+  mshrs.io.req.bits.wdata     := s2_mshrStoreData
+  mshrs.io.req.bits.wmask     := s2_mshrStoreMaskInBytes
 
   // mshr acquire block or perm from L2
   tlBus.a <> mshrs.io.l2Req
@@ -492,7 +483,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // wb in pipeline stage 1
   val wbArbiter = Module(new Arbiter(new WritebackReq(edge.bundle), 2))
 
-  wbPipeReq.valid          := s1_probeWb | s1_replaceWb | s1_amoNoPermWb
+  wbPipeReq.valid          := s1_probeWb | s1_replaceWb
   wbPipeReq.bits.voluntary := !s1_req.isProbe
   wbPipeReq.bits.data      := s1_data
   wbPipeReq.bits.lineAddr  := Mux(s1_replaceWb, s1_repLineAddr, getLineAddr(s1_req.paddr))
@@ -500,12 +491,12 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   wbPipeReq.bits.perm := Mux(
     s1_probeWb,
     s1_probeReportParam,
-    Mux(s1_amoNoPermWb, s1_amoShrinkParam, s1_repShrinkParam),
+    s1_repShrinkParam,
   )
   wbPipeReq.bits.hasData := Mux(
     s1_probeWb,
     s1_probeWbData,
-    Mux(s1_amoNoPermWb, s1_amoNoPermWbData, s1_replaceWbData),
+    s1_replaceWbData,
   )
 
   // source 0: main pipeline
@@ -573,7 +564,6 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
         -> CacheRespStatus.hit,
       (s1_wbqBlockMiss |   // miss addr exist in wbq
         s1_mshrAllocFail | // miss but mshr full
-        s1_amoNoPermMiss | // amo no perm miss release B first
         s1_lrFail)         // lr failed
         -> CacheRespStatus.replay,
     ),
