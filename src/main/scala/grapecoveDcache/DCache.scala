@@ -92,7 +92,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     log2Up(blockBytes).U,
   )
 
-  assert(!(s0_req.isFromCore && s0_req.size > 6.U), "Request size should <= 6")
+  assert(!(s0_req.isFromCore && s0_req.size > 6.U), "Request size should be less than or equal to 6")
 
   // read tag array
   metaArray.io.read.valid       := s0_valid
@@ -189,7 +189,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   assert(
     !(s1_validFromCore && s1_req.cmd === M_PWR && s1_req.size =/= 6.U),
-    "Only support partial write 64 bytes",
+    "Only support partial write of 64 bytes",
   )
   // TODO: PWR assertion
   // TODO: Merge Store & AMO Store
@@ -222,16 +222,14 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     ),
   )
 
-  val s1_storeHitUpdateMeta  = s1_validFromCore && s1_cacheable && s1_upgradePermHit && !s1_scFail
-  val s1_storeMissUpdateMeta = s1_validFromCore && s1_cacheable && (s1_upgradePermMiss && mshrs.io.req.ready)
-
-  val s1_storeUpdateData = s1_validFromCore && s1_cacheable && s1_hit &&
-    isWrite(s1_req.cmd) && !s1_scFail
+  val s1_cacheableCoreReq    = s1_validFromCore && s1_cacheable
+  val s1_storeHitUpdateMeta  = s1_cacheableCoreReq && s1_upgradePermHit && !s1_scFail
+  val s1_storeMissUpdateMeta = s1_cacheableCoreReq && (s1_upgradePermMiss && mshrs.io.req.ready)
+  val s1_storeUpdateData     = s1_cacheableCoreReq && s1_hit && isWrite(s1_req.cmd) && !s1_scFail
 
   // TODO: flush & flush all
 
   // * probe
-  // FIXME
   val s1_canProbe = wbPipeReq.ready // writeback queue ready
   val s1_probeCoh = Mux(s1_isTagMatch, s1_coh, ClientMetadata(0.U))
 
@@ -581,7 +579,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // it will send nextCycleWb to kill other cache request
   assert(
     ~(s1_cacheResp.valid && mshrsResp.valid),
-    "MSHR & Cache Resp cannot exist simultaneously",
+    "MSHR and Cache responses cannot exist simultaneously",
   )
 
   io.fenceRdy := mshrs.io.fenceRdy && !s1_valid && !s2_valid && !s3_valid

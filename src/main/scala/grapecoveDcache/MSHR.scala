@@ -294,7 +294,7 @@ class ReplayModule extends Module() {
     totalCounter,
   )) && !(isPrefetch(io.innerIO.bits.meta.cmd) ||
     (isWriteIntent(io.innerIO.bits.meta.cmd) && !isAMO(io.innerIO.bits.meta.cmd)))
-  io.toPipe.bits.nextCycleWb_sourceId := io.innerIO.bits.meta.sourceId
+  io.toPipe.bits.nextSourceId := io.innerIO.bits.meta.sourceId
 
   io.toPipe.valid         := RegNext(io.toPipe.bits.nextCycleWb)
   io.toPipe.bits.regIdx   := replayMeta.regIdx

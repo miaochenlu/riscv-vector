@@ -12,19 +12,18 @@ class MSHRWrapper(
   val io = IO(new Bundle {
     val req = Flipped(DecoupledIO(new MSHRWrapperPipeReq(edge.bundle)))
 
+    val nextCycleWb  = Output(Bool())
+    val nextSourceId = Output(UInt(MasterSource.width.W))
+    val fenceRdy     = Output(Bool())
+    val resp         = ValidIO(new DataExchangeResp)
+
     val l2Req      = DecoupledIO(new TLBundleA(edge.bundle))
     val fromRefill = Flipped(DecoupledIO(new RefillMSHRFile()))
-
-    val nextCycleWb          = Output(Bool())
-    val nextCycleWb_sourceId = Output(UInt(MasterSource.width.W))
-    val resp                 = ValidIO(new DataExchangeResp)
 
     val probeCheck    = new ProbeMSHRFile
     val probeRefill   = ValidIO(new ProbeRefill)
     val toReplace     = DecoupledIO(new MSHRReplace())
     val replaceStatus = Input(ReplaceStatus())
-
-    val fenceRdy = Output(Bool())
   })
 
   val mshrs   = Module(new MSHRFile())
@@ -37,6 +36,14 @@ class MSHRWrapper(
     !io.req.bits.cacheable || iomshrs.io.addrMatch,
     false.B,
     Mux(io.req.bits.noAlloc, mshrs.io.addrMatch, true.B),
+  )
+
+  io.req.ready := MuxCase(
+    false.B,
+    Array(
+      validIOMSHRReq -> iomshrs.io.req.ready,
+      validMSHRReq   -> mshrs.io.pipelineReq.ready,
+    ),
   )
 
   // req signal connect
@@ -56,24 +63,22 @@ class MSHRWrapper(
   iomshrs.io.req.valid := io.req.valid && validIOMSHRReq
   iomshrs.io.req.bits  := io.req.bits
 
-  io.req.ready := Mux(
-    validIOMSHRReq,
-    iomshrs.io.req.ready,
-    Mux(validMSHRReq, mshrs.io.pipelineReq.ready, false.B),
-  )
+  // request L2 using TL A with arbiter
+  val arbiter = Module(new Arbiter(new TLBundleA(edge.bundle), 2))
 
-  // request L2 using TL A
-  val acquire = edge.AcquireBlock(
+  // source 0: iomshr
+  arbiter.io.in(0) <> iomshrs.io.l2Req
+  // source 1: mshr
+  arbiter.io.in(1).valid := mshrs.io.toL2Req.valid
+  mshrs.io.toL2Req.ready := arbiter.io.in(1).ready
+  arbiter.io.in(1).bits := edge.AcquireBlock(
     fromSource = mshrs.io.toL2Req.bits.entryId,
     toAddress = mshrs.io.toL2Req.bits.lineAddr << blockOffBits,
     lgSize = log2Ceil(blockBytes).U,
     growPermissions = mshrs.io.toL2Req.bits.perm,
   )._2
 
-  io.l2Req.valid         := mshrs.io.toL2Req.valid || iomshrs.io.l2Req.valid
-  mshrs.io.toL2Req.ready := io.l2Req.ready && !iomshrs.io.l2Req.valid
-  iomshrs.io.l2Req.ready := io.l2Req.ready
-  io.l2Req.bits          := Mux(iomshrs.io.l2Req.valid, iomshrs.io.l2Req.bits, acquire)
+  io.l2Req <> arbiter.io.out
 
   // refill data
   val refillMSHR = io.fromRefill.bits.entryId < nMSHRs.asUInt
@@ -103,16 +108,21 @@ class MSHRWrapper(
   mshrsResp.size    := mshrs.io.toPipeline.bits.size
   mshrsResp.hasData := mshrs.io.toPipeline.valid
 
+  val respArbiter = Module(new Arbiter(new DataExchangeResp, 2))
+  respArbiter.io.in(0).valid := mshrs.io.toPipeline.valid
+  respArbiter.io.in(0).bits  := mshrsResp
+  respArbiter.io.in(1) <> iomshrs.io.resp
+  respArbiter.io.out.ready := true.B
+
+  io.resp.valid := respArbiter.io.out.valid
+  io.resp.bits  := respArbiter.io.out.bits
+
   io.nextCycleWb := mshrs.io.toPipeline.bits.nextCycleWb || iomshrs.io.nextCycleWb
-  io.nextCycleWb_sourceId := Mux(
+  io.nextSourceId := Mux(
     mshrs.io.toPipeline.bits.nextCycleWb,
-    mshrs.io.toPipeline.bits.nextCycleWb_sourceId,
-    iomshrs.io.nextCycleWb_sourceId,
+    mshrs.io.toPipeline.bits.nextSourceId,
+    iomshrs.io.nextSourceId,
   )
-  dontTouch(io.nextCycleWb_sourceId)
-  io.resp.valid         := mshrs.io.toPipeline.valid || iomshrs.io.resp.valid
-  io.resp.bits          := Mux(mshrs.io.toPipeline.valid, mshrsResp, iomshrs.io.resp.bits)
-  iomshrs.io.resp.ready := !mshrs.io.toPipeline.valid
 
   // others for MSHR
   io.toReplace <> mshrs.io.toReplace
