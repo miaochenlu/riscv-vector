@@ -798,10 +798,11 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         m1_reg_next_pc := ex_reg_next_pc
       }
 
+
       when(!ctrl_killx(i)) {
         // Todo: add branch instrn for wdata
         m1_reg_wdata(i) := {
-          if (i == 0) alu_p0.io.out else Mux(ex_jalx, ex_nl_pc, alu_p1.io.out)
+          if (i == 0) alu_p0.io.out else Mux(ex_jalx, Cat(Fill(xLen - vaddrBitsExtended, ex_nl_pc(vaddrBitsExtended - 1)), ex_nl_pc), alu_p1.io.out)
         }
       }
       m1_reg_valids(i) := !ctrl_killx(i)
@@ -920,7 +921,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_direction_misprediction = m2_br_ctrl.branch && m2_br_taken =/= m2_reg_uops(1).btb_resp.bht.taken
     val m2_misprediction = m2_wrong_npc
 
-    val m2_alu_wdata_p1 = Mux(m2_jalx, m2_nl_pc, aluM2_p1.io.out)
+    val m2_alu_wdata_p1 = Mux(m2_jalx, Cat(Fill(xLen - vaddrBitsExtended, m2_nl_pc(vaddrBitsExtended - 1)), m2_nl_pc), aluM2_p1.io.out)
 
     val m1_pc_valids = Wire(Vec(2, Bool()))
     for (i <- 0 until 2) {
