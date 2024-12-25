@@ -622,15 +622,17 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       Mux(ex_br_ctrl.branch, ImmGen(IMM_SB, ex_reg_uops(1).inst),
         Mux(ex_reg_uops(1).rvc, 2.S, 4.S))
     val ex_nl_pc = (ex_reg_uops(1).pc.asSInt + Mux(ex_reg_uops(1).rvc, 2.S, 4.S)).asUInt
-    val ex_npc = (Mux(ex_jalx || ex_reg_sfence, encodeVirtualAddress(alu_p1.io.out, alu_p1.io.out).asSInt,
-      ex_br_target) & (-2).S).asUInt
+    val ex_npc = (Mux(ex_reg_sfence, encodeVirtualAddress(alu_p0.io.out, alu_p0.io.out).asSInt,
+      Mux(ex_jalx, encodeVirtualAddress(alu_p1.io.out, alu_p1.io.out).asSInt,
+        ex_br_target)) & (-2).S).asUInt
     val ex_wrong_npc = ex_wdata_ready(1) && ex_cfi &&
       Mux(ex_br_ctrl.branch, ex_br_taken =/= ex_reg_uops(1).btb_resp.bht.taken, ex_npc =/= ex_npc_predict)
     val ex_npc_misaligned = !csr.io.status.isa('c' - 'a') && ex_npc(1) && !ex_reg_sfence
     val ex_cfi_taken = (ex_br_ctrl.branch && ex_br_taken) || ex_br_ctrl.jalr || ex_br_ctrl.jal
     val ex_direction_misprediction = ex_br_ctrl.branch && ex_br_taken =/= ex_reg_uops(1).btb_resp.bht.taken
     val ex_misprediction = ex_wrong_npc
-    take_pc_ex_p1 := ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && (ex_misprediction || ex_reg_sfence)
+    take_pc_ex_p1 := ex_reg_valids(0) && !ex_reg_uops(0).xcpt_noIntrp && ex_reg_sfence ||
+      ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && ex_misprediction
 
     // multiplier and divider
     val div = Module(new MulDiv(if (pipelinedMul) mulDivParams.copy(mulUnroll = 0) else mulDivParams, width = xLen, aluFn = aluFn))
@@ -1166,7 +1168,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val tval_inst = m2_reg_cause(0) === Causes.illegal_instruction.U
     val tval_valid = csr.io.exception && (tval_any_addr || tval_inst)
     // FIXME - real value of tval
-    csr.io.tval := Mux(tval_valid, encodeVirtualAddress(m2_reg_wdata(0), m2_reg_wdata(0)), 0.U)
+    csr.io.tval := Mux(tval_valid, encodeVirtualAddress(aluM2_p0.io.out, aluM2_p0.io.out), 0.U)
     csr.io.gva := false.B
     csr.io.htval := false.B
 
@@ -1184,7 +1186,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val m2_valid_final_p0 = m2_reg_valids(0) && !(m2_reg_swap && m2_xcpt(1))
     csr.io.rw.addr := m2_reg_uops(0).inst(31, 20)
     csr.io.rw.cmd := CSR.maskCmd(m2_valid_final_p0, m2_reg_uops(0).ctrl.csr)
-    csr.io.rw.wdata := m2_reg_wdata(0)
+    csr.io.rw.wdata := aluM2_p0.io.out
 
     def vlmul_mag(vlmul: UInt): UInt = Mux(vlmul(2) && vlmul(0), Cat(!vlmul(1), true.B), vlmul(1, 0))
 
@@ -1393,7 +1395,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.imem.sfence.valid := m2_reg_valids(0) && m2_reg_sfence
     io.imem.sfence.bits.rs1 := m2_reg_mem_size(0)
     io.imem.sfence.bits.rs2 := m2_reg_mem_size(1)
-    io.imem.sfence.bits.addr := m2_reg_wdata(0)
+    io.imem.sfence.bits.addr := aluM2_p0.io.out
     io.imem.sfence.bits.asid := m2_p0_rs(1)
     io.ptw.sfence := io.imem.sfence
 
