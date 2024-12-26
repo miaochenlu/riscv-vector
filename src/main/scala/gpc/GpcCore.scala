@@ -343,8 +343,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val data_hazard_ex_uop0_p0 = ex_ctrls(0).wxd && checkHazards(hazard_targets(0), _ === ex_reg_uops(0).rd)
     val data_hazard_ex_uop0_p1 = ex_ctrls(1).wxd && checkHazards(hazard_targets(0), _ === ex_reg_uops(1).rd)
     // ALU(m2) can't bypass to store(store data m1)
-    val ex_cannot_bypass_p0 = ex_ctrls(0).csr =/= CSR.N || ex_ctrls(0).mem || ex_ctrls(0).alu && id_ctrls(0).mem && (id_ctrls(0).mem_cmd === M_XWR)
-    val ex_cannot_bypass_p1 = ex_ctrls(1).div || ex_ctrls(1).fp || ex_ctrls(1).mul || ex_ctrls(1).alu && id_ctrls(0).mem && (id_ctrls(0).mem_cmd === M_XWR)
+    val ex_cannot_bypass_p0 = ex_ctrls(0).csr =/= CSR.N || ex_ctrls(0).mem || ex_ctrls(0).alu && id_ctrls(0).mem && isWrite(id_ctrls(0).mem_cmd)
+    val ex_cannot_bypass_p1 = ex_ctrls(1).div || ex_ctrls(1).fp || ex_ctrls(1).mul || ex_ctrls(1).alu && id_ctrls(0).mem && isWrite(id_ctrls(0).mem_cmd)
     val ex_can_bypass_uop0_p0 = ex_ctrls(0).mem && id_ctrls(0).alu
     val ex_can_bypass_uop0_p1 = ex_ctrls(1).mul && id_ctrls(0).alu
     // Using "||" is sufficient, because results of two pipes on the same stage cannot have WAW.
@@ -730,7 +730,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         ( {
           if (i == 0) ex_reg_uops(i).interrupt else false.B
         } || ex_reg_uops(i).xcpt_noIntrp, ex_reg_cause(i)),
-        (ex_reg_valids(0) && ex_npc_misaligned, Causes.misaligned_fetch.U)
+        (ex_reg_valids(i) && ex_npc_misaligned, Causes.misaligned_fetch.U)
       ))
     }
     val ex_xcpt = ex_check_xcpt.map(_._1)
@@ -825,7 +825,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         ( {
           if (i == 0) m1_reg_uops(i).interrupt else false.B
         } || m1_reg_uops(i).xcpt_noIntrp, m1_reg_cause(i)),
-        (m1_reg_valids(0) && m1_ldst_xcpt, m1_ldst_cause)
+        (m1_reg_valids(i) && m1_ldst_xcpt, m1_ldst_cause)
       ))
     }
     val m1_xcpt = m1_xcpt_cause.map(_._1)
@@ -975,19 +975,26 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       vxcpt_cause.ae.ld -> Causes.load_access.U,
       vxcpt_cause.ae.st -> Causes.store_access.U,
     ))
-    val m2_xcpt_cause_p0 = checkExceptions(List(
-      (vxcpt_flush, vxcpt_cause_case),
-      (m2_reg_xcpt(0), m2_reg_cause(0)),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.pf.st, Causes.store_page_fault.U),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.pf.ld, Causes.load_page_fault.U),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ae.st, Causes.store_access.U),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ae.ld, Causes.load_access.U),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ma.st, Causes.misaligned_store.U),
-      (m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && io.dmem.s2_xcpt.ma.ld, Causes.misaligned_load.U)
-    ))
 
-    val m2_xcpt = Seq(m2_xcpt_cause_p0._1, Mux(m2_reg_swap, m2_reg_xcpt(1), m2_reg_xcpt(1) && !m2_reg_flush_pipe))
-    val m2_cause = Seq(m2_xcpt_cause_p0._2, m2_reg_cause(1))
+    val m2_xcpt_cause = (0 until 2) map { i =>
+      checkExceptions(List(
+        ( {
+          if (i == 0) vxcpt_flush else false.B
+        }, vxcpt_cause_case),
+        ( {
+          if (i == 1) Mux(m2_reg_swap, m2_reg_xcpt(i), m2_reg_xcpt(i) && !m2_reg_flush_pipe) else m2_reg_xcpt(i)
+        }, m2_reg_cause(i)),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.pf.st, Causes.store_page_fault.U),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.pf.ld, Causes.load_page_fault.U),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.ae.st, Causes.store_access.U),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.ae.ld, Causes.load_access.U),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.ma.st, Causes.misaligned_store.U),
+        (m2_reg_valids(i) && m2_reg_uops(i).ctrl.mem && io.dmem.s2_xcpt.ma.ld, Causes.misaligned_load.U)
+      ))
+    }
+
+    val m2_xcpt = m2_xcpt_cause.map(_._1)
+    val m2_cause = m2_xcpt_cause.map(_._2)
 
     val m2_dcache_miss_p0 = m2_reg_uops(0).ctrl.mem && !io.dmem.resp.valid && !io.dmem.s2_nack
     val m2_dcache_miss_p1 = m2_reg_uops(1).ctrl.mem && !io.dmem.resp.valid && !io.dmem.s2_nack
@@ -1089,7 +1096,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       val fp_busyTable = Module(new BusyTable())
       val f_table = Wire(UInt(32.W))
       fp_busyTable.io.setEnVec := VecInit(false.B, false.B, (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd ||
-        io.fpu.sboard_set && !io.fpu.sboard_clr || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1))
+        io.fpu.sboard_set && !io.fpu.sboard_clr || m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && !ctrl_killm2(1))
       fp_busyTable.io.setAddrVec := VecInit(0.U, 0.U, m2_reg_uops(1).rd)
       fp_busyTable.io.clrEnVec := VecInit(dmem_resp_replay && dmem_resp_fpu, io.fpu.sboard_clr, io.vwb_ready.wb_fp_ready && io.vcomplete.wen_fp)
       fp_busyTable.io.clrAddrVec := VecInit(dmem_resp_waddr, io.fpu.sboard_clra, io.vcomplete.wdata_reg_idx)
@@ -1168,7 +1175,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val tval_inst = m2_reg_cause(0) === Causes.illegal_instruction.U
     val tval_valid = csr.io.exception && (tval_any_addr || tval_inst)
     // FIXME - real value of tval
-    csr.io.tval := Mux(tval_valid, encodeVirtualAddress(aluM2_p0.io.out, aluM2_p0.io.out), 0.U)
+    val aluM2_mux = Mux(m2_xcpt(1), aluM2_p1.io.out, aluM2_p0.io.out)
+    csr.io.tval := Mux(tval_valid, encodeVirtualAddress(aluM2_mux, aluM2_mux), 0.U)
     csr.io.gva := false.B
     csr.io.htval := false.B
 
@@ -1536,9 +1544,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       val fp_wdata = Mux(wr0_en, wr0_data, wr1_data)
 
       ll_ind(0) := m2_set_busyTable_p0 && !ctrl_killm2(0)
-      ll_ind(1) := m2_set_busyTable_p1 && !ctrl_killm2(1) ||
-        (m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr || io.fpu.sfma_ind_m2.get ||
-          m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && m2_reg_valids(1)
+      ll_ind(1) := (m2_set_busyTable_p1 || m2_dcache_miss_p1 && m2_reg_uops(1).ctrl.wfd || io.fpu.sboard_set && !io.fpu.sboard_clr || io.fpu.sfma_ind_m2.get ||
+        m2_reg_uops(1).vec_arith && m2_reg_uops(1).ctrl.wfd) && !ctrl_killm2(1)
 
       wb_raw_inst(0) := RegNext(RegNext(RegNext(RegNext(io.imem.resp(0).bits.raw_inst(15, 0)))))
       wb_raw_inst(1) := RegNext(RegNext(RegNext(RegNext(io.imem.resp(1).bits.raw_inst(15, 0)))))
