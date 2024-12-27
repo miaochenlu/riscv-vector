@@ -210,10 +210,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     val ex_int_dmem_req = Wire(Bool())
     val ex_fp_dmem_req = Wire(Bool())
-    val m1_int_dmem_req = Reg(Bool())
-    val m1_fp_dmem_req = Reg(Bool())
-    val m2_int_dmem_req = Reg(Bool())
-    val m2_fp_dmem_req = Reg(Bool())
+    val m1_int_dmem_req = Wire(Bool())
+    val m1_fp_dmem_req = Wire(Bool())
+    val m2_int_dmem_req = Wire(Bool())
+    val m2_fp_dmem_req = Wire(Bool())
 
     val ex_reg_uops = RegInit(VecInit.fill(decodeWidthGpc)(0.U.asTypeOf(new SUOp)))
     val ex_reg_valids = RegInit(VecInit(Seq.fill(decodeWidthGpc)(false.B)))
@@ -786,13 +786,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
         }
       }
 
-      when(!ctrl_killx(0)) {
-        m1_int_dmem_req := ex_int_dmem_req
-      }
-      when(!ctrl_killx(1)) {
-        m1_fp_dmem_req := ex_fp_dmem_req
-      }
-
       when(!ctrl_killx(i)) {
         m1_reg_rsdata(i) := {
           if (i == 0) ex_p0_rs else ex_p1_rs
@@ -939,13 +932,6 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
           m2_reg_mem_size := m1_reg_mem_size
           m2_reg_wphit := m1_reg_wphit | bpu.io.bpwatch.map { bpw => (bpw.rvalid(0) && m1_reg_load) || (bpw.wvalid(0) && m1_reg_store) }
         }
-      }
-
-      when(!ctrl_killm1(0)) {
-        m2_int_dmem_req := m1_int_dmem_req
-      }
-      when(!ctrl_killm1(1)) {
-        m2_fp_dmem_req := m1_fp_dmem_req
       }
 
       when(!ctrl_killm1(i)) {
@@ -1457,6 +1443,14 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
 
     ex_int_dmem_req := ex_reg_valids(0) && ex_reg_uops(0).ctrl.mem && !ctrl_killx(0)
     ex_fp_dmem_req := ex_reg_valids(1) && ex_reg_uops(1).ctrl.mem && !ctrl_killx(1)
+    m1_int_dmem_req := m1_reg_valids(0) && m1_reg_uops(0).ctrl.mem && !ctrl_killm1(0)
+    m1_fp_dmem_req := m1_reg_valids(1) && m1_reg_uops(1).ctrl.mem && !ctrl_killm1(1)
+    m2_int_dmem_req := m2_reg_valids(0) && m2_reg_uops(0).ctrl.mem && !ctrl_killm2(0)
+    m2_fp_dmem_req := m2_reg_valids(1) && m2_reg_uops(1).ctrl.mem && !ctrl_killm2(1)
+
+    val m1_int_dmem_kill = m1_reg_valids(0) && m1_reg_uops(0).ctrl.mem && ctrl_killm1(0)
+    val m1_fp_dmem_kill = m1_reg_valids(1) && m1_reg_uops(1).ctrl.mem && ctrl_killm1(1)
+
     io.dmem.req.valid := ex_int_dmem_req || ex_fp_dmem_req
     val ex_dcache_tag = Mux(ex_int_dmem_req, Cat(ex_reg_uops(0).rd, ex_reg_uops(0).ctrl.fp), Cat(ex_reg_uops(1).rd, ex_reg_uops(1).ctrl.fp))
     require(coreParams.dcacheReqTagBits >= ex_dcache_tag.getWidth)
@@ -1480,7 +1474,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       (if (fLen == 0) m1_p1_rs(1) else Mux(m1_reg_uops(1).ctrl.fp, Fill((xLen max fLen) / fLen, io.fpu.store_data), m1_p1_rs(1))))
     io.dmem.s1_data.mask := DontCare
 
-    io.dmem.s1_kill := m1_reg_valids(0) && m1_int_dmem_req && ctrl_killm1(0) || m1_reg_valids(1) && m1_fp_dmem_req && ctrl_killm1(1) //REVIEW
+    io.dmem.s1_kill := m1_int_dmem_kill || m1_fp_dmem_kill //REVIEW
     io.dmem.s2_kill := false.B
     // don't let D$ go to sleep if we're probably going to use it soon
     io.dmem.keep_clock_enabled := true.B //REVIEW
