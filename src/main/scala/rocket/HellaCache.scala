@@ -207,7 +207,7 @@ abstract class HellaCache(tileId: Int)(implicit p: Parameters) extends LazyModul
 
   val node = TLClientNode(Seq(TLMasterPortParameters.v1(
     clients = cacheClientParameters ++ mmioClientParameters,
-    minLatency = 1,
+    minLatency = 0,
     requestFields = tileParams.core.useVM.option(Seq()).getOrElse(Seq(AMBAProtField())))))
 
   val hartIdSinkNodeOpt = cfg.scratch.map(_ => BundleBridgeSink[UInt]())
