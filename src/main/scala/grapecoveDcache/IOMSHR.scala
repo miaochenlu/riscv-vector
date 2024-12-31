@@ -143,7 +143,7 @@ class IOMSHRFile(
 
   counter := Mux(allBeatDone, 0.U, Mux(io.l2Req.fire, counter + 1.U, counter))
 
-  io.l2Req.valid           := senderQueue.io.deq.valid && !sendNReadyList.asUInt.orR
+  io.l2Req.valid           := senderQueue.io.deq.valid && !sendNReadyList(senderQueue.io.deq.bits)
   senderQueue.io.deq.ready := allBeatDone
   io.l2Req.bits := Mux(
     reqList(senderQueue.io.deq.bits).noAlloc && a_cmd === M_PWR,
