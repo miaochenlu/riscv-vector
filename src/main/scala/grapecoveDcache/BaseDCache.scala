@@ -24,7 +24,7 @@ class BaseDCache()(
 
   val node = TLClientNode(Seq(TLMasterPortParameters.v1(
     clients = cacheClientParameters ++ mmioClientParameters,
-    minLatency = 1,
+    minLatency = 0,
   )))
 
   lazy val module = new BaseDCacheImp(this)
