@@ -246,7 +246,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   val s1_repCoh         = s1_coh
   val s1_repDirty       = s1_repCoh.onCacheControl(M_FLUSH)._1
   val s1_repShrinkParam = s1_repCoh.onCacheControl(M_FLUSH)._2
-  val s1_replaceWb      = s1_validRefill && (s1_repCoh.state > ClientStates.Nothing)
+  val s1_replaceWb      = s1_validRefill && (s1_repCoh.state === ClientStates.Dirty)
   val s1_replaceWbData  = s1_repDirty
 
   // * refill
