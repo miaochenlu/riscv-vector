@@ -102,8 +102,8 @@ class TLCacheCork(params: TLCacheCorkParams = TLCacheCorkParams())(implicit p: P
 
         // Releases without Data succeed instantly
         val c_d = Wire(chiselTypeOf(in.d))
-        c_d.valid := in.c.valid && in.c.bits.opcode === Release
-        c_d.bits := edgeIn.ReleaseAck(in.c.bits)
+        c_d.valid := RegNext(in.c.valid && in.c.bits.opcode === Release)
+        c_d.bits := RegNext(edgeIn.ReleaseAck(in.c.bits))
 
         assert (!in.c.valid || in.c.bits.opcode === Release || in.c.bits.opcode === ReleaseData)
         in.c.ready := Mux(in.c.bits.opcode === Release, c_d.ready, c_a.ready)
