@@ -9,7 +9,7 @@ CONFIG ?= $(CFG_PROJECT).DefaultConfig
 MILL ?= mill
 
 verilog:
-	cd dependencies/gpc_cache && git checkout gpc_cache_wb && git pull && cd -
+	cd dependencies/gpc_cache && git pull && git checkout gpc_cache_wb && git pull && cd -
 	rm -rf src/main/scala/gpcdcache && mkdir src/main/scala/gpcdcache/
 	cp dependencies/gpc_cache/src/main/scala/grapecoveDcache/* src/main/scala/gpcdcache/
 	cd $(base_dir) && $(MILL) emulator[gpc.system.TestHarness,$(CONFIG)].mfccompiler.compile
