@@ -212,7 +212,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
     lrscCount,
     Seq(
       // probe during backingOff
-      s1_validProbe -> 0.U,
+      (s1_validProbe && (getLineAddr(s1_req.paddr) === lrscAddr)) -> 0.U,
       // lr hit
       (s1_hit && s1_lr && (lrscCount === 0.U)) -> (lrscCycles - 1).U,
       // lr after lr | sc | other cmd
