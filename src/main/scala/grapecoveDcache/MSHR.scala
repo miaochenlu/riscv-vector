@@ -516,8 +516,10 @@ class MSHRFile extends Module() {
     maskArray(replayReg.io.replayIdx) := 0.U
     dataArray(replayReg.io.replayIdx) := 0.U
     dataArrayWriteEna                 := false.B
+    amoDataArrayWriteEna              := false.B
   }.otherwise {
-    dataArrayWriteEna := false.B
+    dataArrayWriteEna    := false.B
+    amoDataArrayWriteEna := false.B
   }
 
   // receive miss addr data at s2
