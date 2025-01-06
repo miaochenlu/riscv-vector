@@ -11,7 +11,10 @@ class DataExchangeReq extends Bundle {
   val source = UInt(MasterSource.width.W)
   val paddr  = UInt(paddrWidth.W)
   val cmd    = UInt(M_SZ.W)
-  // 64 -> 2, 512 -> 3
+  // 8B -> 2, 64B -> 3
+  // 8B example
+  // core<>cache: 1B, 2B, 4B, 8B
+  // sz encoding: 0 , 1 , 2 , 3
   val size    = UInt(log2Up(log2Up(dataBytes)).W)
   val signed  = Bool()
   val wdata   = UInt(dataWidth.W)
