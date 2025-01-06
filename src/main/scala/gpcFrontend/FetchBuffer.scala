@@ -16,6 +16,7 @@ class EnqueueBuddle(implicit p: Parameters) extends CoreBundle()(p) {
   val rvc = Output(Vec(fetchWidth, Bool()))
   val xcpt = Output(new FrontendExceptions)
   val replay = Output(Bool())
+  val edge_inst = Output(Bool())
 }
 
 class Ptr(numEntries: Int) extends Bundle {
@@ -112,6 +113,7 @@ class FetchBuffer(implicit p: Parameters) extends CoreModule{
     enq_data(i).bits.xcpt := io.enq.bits.xcpt
     enq_data(i).bits.replay := io.enq.bits.replay
     enq_data(i).bits.btb := io.enq.bits.btb_resp
+    enq_data(i).bits.edge_inst := (i == 0).B && io.enq.bits.edge_inst
   }
   dontTouch(enq_data)
 /* Enqueue */

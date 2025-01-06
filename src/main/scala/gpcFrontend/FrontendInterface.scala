@@ -46,6 +46,7 @@ class FrontendResp(implicit p: Parameters) extends CoreBundle()(p) {
     val rvc = Bool()
     val xcpt = new FrontendExceptions
     val replay = Bool()
+    val edge_inst = Bool()
 }
 
 class FrontendReq(implicit p: Parameters) extends CoreBundle()(p) {
