@@ -688,7 +688,10 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
           when(bpu.io.xcpt_if || frontend_xcpt_swapped(i).pf.inst ||
             frontend_xcpt_swapped(i).ae.inst) { // badaddr := PC  //FIXME - bpu.io.xcpt_if
             ex_reg_uops(i).ctrl.sel_alu1 := A1_PC
-            ex_reg_uops(i).ctrl.sel_alu2 := A2_ZERO
+            ex_reg_uops(i).ctrl.sel_alu2 := Mux(io.imem.resp(i).bits.edge_inst, A2_SIZE, A2_ZERO)
+            when(io.imem.resp(i).bits.edge_inst) {
+              ex_reg_uops(i).rvc := true.B
+            }
           }
         }
       }
