@@ -7,10 +7,7 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  verilator-version: v4.218
-  verilator-install-dir: verilator-install
-
+# find verilator binaries here https://repology.org/project/verilator/versions
 jobs:
   ci:
     name: ci
@@ -30,29 +27,16 @@ jobs:
       - name: Setup Dependencies
         run: |
           sudo apt-get install ccache
-      - name: Get Cached Verilator
-        id: get-cached-verilator
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.verilator-install-dir }}
-          key: verilator-${{ env.verilator-version }}
       - name: Install Verilator
-        if: steps.get-cached-verilator.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
-          git clone https://github.com/verilator/verilator
+          wget https://github.com/verilator/verilator/archive/v4.218/verilator-4.218.tar.gz
+          tar -xvf verilator-4.218.tar.gz verilator
           unset VERILATOR_ROOT
-          cd verilator
-          git checkout ${{ env.verilator-version  }}
-          autoconf
-          ./configure --prefix=$(pwd)/../${{ env.verilator-install-dir }}
-          make
-          make install
       - name: Set PATH
         run: |
-          echo "$(pwd)/${{ env.verilator-install-dir }}/bin" >> $GITHUB_PATH
-          echo VERILATOR_ROOT="$(pwd)/${{ env.verilator-install-dir }}/share/verilator" >> $GITHUB_ENV
-          ln -sf $(pwd)/${{ env.verilator-install-dir }}/bin/verilator_bin $(pwd)/${{ env.verilator-install-dir }}/share/verilator/verilator_bin
+          echo "$(pwd)/verilator/bin" >> $GITHUB_PATH
+          echo VERILATOR_ROOT="$(pwd)/verilator/bin/verilator" >> $GITHUB_ENV
       - name: test
         run: |
           make init  
