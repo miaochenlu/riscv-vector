@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: GPC DCache Test
 
 on:
   push:
@@ -37,7 +37,8 @@ jobs:
       - name: Set PATH
         run: |
           echo "$(pwd)/verilator/bin" >> $GITHUB_PATH
-          echo VERILATOR_ROOT="$(pwd)/verilator/bin/verilator" >> $GITHUB_ENV
+          echo VERILATOR_ROOT="$(pwd)/verilator" >> $GITHUB_ENV
+          ln -sf $(pwd)/verilator/verilator_bin $(pwd)/verilator/bin
       - name: test
         run: |
           make init  
