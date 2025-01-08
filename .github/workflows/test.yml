@@ -26,7 +26,7 @@ jobs:
         uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
-          apps: sbt mill
+          apps: mill
       - name: Setup Dependencies
         run: |
           sudo apt-get install ccache
@@ -54,4 +54,6 @@ jobs:
           echo VERILATOR_ROOT="$(pwd)/${{ env.verilator-install-dir }}/share/verilator" >> $GITHUB_ENV
           ln -sf $(pwd)/${{ env.verilator-install-dir }}/bin/verilator_bin $(pwd)/${{ env.verilator-install-dir }}/share/verilator/verilator_bin
       - name: test
-        run: make test
+        run: |
+          make init
+          make test
