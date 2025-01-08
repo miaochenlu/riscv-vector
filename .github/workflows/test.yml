@@ -33,7 +33,11 @@ jobs:
       - name: test
         run: |
           make init  
-          make test
+          make test_dcache
+          make test_amo
+          make test_mmio
+          make test_forward
+          make test_bypass
 
 
 # sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
