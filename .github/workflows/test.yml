@@ -26,7 +26,7 @@ jobs:
         uses: coursier/setup-action@v1
         with:
           jvm: adopt:11
-          apps: mill
+          apps: sbt mill
       - name: Setup Dependencies
         run: |
           sudo apt-get install ccache
@@ -43,4 +43,6 @@ jobs:
       - name: test
         run: |
           make init
+          mill resolve _
+          mill resolve __.test
           mill _.test
