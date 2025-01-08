@@ -3,7 +3,7 @@ name: Continuous Integration
 on:
   push:
     tags: ['*']
-    branches: ['gpc_cache_ci']
+    branches: ['gpc_cache*']
   pull_request:
   workflow_dispatch:
 
@@ -32,7 +32,7 @@ jobs:
           sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
           wget https://github.com/verilator/verilator/archive/v4.218/verilator-4.218.tar.gz
           tar -xvf verilator-4.218.tar.gz
-          mv verilator-4.218.tar.gz verilator
+          mv verilator-4.218 verilator
           unset VERILATOR_ROOT
       - name: Set PATH
         run: |
