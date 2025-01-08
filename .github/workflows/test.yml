@@ -31,7 +31,8 @@ jobs:
         run: |
           sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
           wget https://github.com/verilator/verilator/archive/v4.218/verilator-4.218.tar.gz
-          tar -xvf verilator-4.218.tar.gz verilator
+          tar -xvf verilator-4.218.tar.gz
+          mv verilator-4.218.tar.gz verilator
           unset VERILATOR_ROOT
       - name: Set PATH
         run: |
