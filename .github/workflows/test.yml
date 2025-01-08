@@ -45,4 +45,5 @@ jobs:
           make init
           mill resolve _
           mill resolve __.test
-          mill _.test
+          mill __.test
+          make test
