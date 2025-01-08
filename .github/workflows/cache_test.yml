@@ -1,0 +1,38 @@
+name: GPC DCache Test
+
+on:
+  push:
+    tags: ['*']
+    branches: ['gpc_cache*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cleanup
+        run: sed -i "s/grapecoveDCache[chisel3]/test/g" build.sc
+      - name: Cache Scala
+        uses: coursier/cache-action@v6
+      - name: Setup Scala
+        uses: coursier/setup-action@v1
+        with:
+          jvm: adopt:11
+          apps: sbt mill
+      - name: Setup Dependencies
+        run: |
+          sudo apt-get install ccache
+      - name: Install Verilator
+        run: |
+          sudo apt-get install verilator
+      - name: Init Submodule
+        run: |
+          make init 
+      - name: Cache Test
+        run: |
+          make test
+
