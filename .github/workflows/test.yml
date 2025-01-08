@@ -29,17 +29,20 @@ jobs:
           sudo apt-get install ccache
       - name: Install Verilator
         run: |
-          sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
-          wget https://github.com/verilator/verilator/archive/v4.218/verilator-4.218.tar.gz
-          tar -xvf verilator-4.218.tar.gz
-          mv verilator-4.218 verilator
-          unset VERILATOR_ROOT
-      - name: Set PATH
-        run: |
-          echo "$(pwd)/verilator/bin" >> $GITHUB_PATH
-          echo VERILATOR_ROOT="$(pwd)/verilator" >> $GITHUB_ENV
-          ln -sf $(pwd)/verilator/verilator_bin $(pwd)/verilator/bin
+          sudo apt-get install verilator
       - name: test
         run: |
           make init  
           make test
+
+
+# sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
+# wget https://github.com/verilator/verilator/archive/v4.218/verilator-4.218.tar.gz 
+# tar -xf verilator-4.218.tar.gz
+# mv verilator-4.218 verilator
+# unset VERILATOR_ROOT
+# - name: Set PATH
+# run: |
+# echo "$(pwd)/verilator/bin" >> $GITHUB_PATH
+# echo VERILATOR_ROOT="$(pwd)/verilator" >> $GITHUB_ENV
+# ln -sf $(pwd)/verilator/verilator_bin $(pwd)/verilator/bin
