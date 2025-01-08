@@ -40,10 +40,20 @@ jobs:
         if: steps.get-cached-verilator.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install git help2man perl python3 make autoconf g++ flex bison numactl perl-doc libfl-dev
+          git clone https://github.com/verilator/verilator
+          unset VERILATOR_ROOT
+          cd verilator
+          git checkout ${{ env.verilator-version  }}
+          autoconf
+          ./configure --prefix=$(pwd)/../${{ env.verilator-install-dir }}
+          make
+          make install
+      - name: Set PATH
+        run: |
+          echo "$(pwd)/${{ env.verilator-install-dir }}/bin" >> $GITHUB_PATH
+          echo VERILATOR_ROOT="$(pwd)/${{ env.verilator-install-dir }}/share/verilator" >> $GITHUB_ENV
+          ln -sf $(pwd)/${{ env.verilator-install-dir }}/bin/verilator_bin $(pwd)/${{ env.verilator-install-dir }}/share/verilator/verilator_bin
       - name: test
         run: |
-          make init
-          mill resolve _
-          mill resolve __.test
-          mill __.test
+          make init  
           make test
