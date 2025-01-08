@@ -34,5 +34,10 @@ jobs:
           make init 
       - name: Cache Test
         run: |
-          make test
+          make test_dcache
+          make test_amo
+          make test_lrsc
+          make test_mmio
+          make test_forward
+          make test_bypass
 
