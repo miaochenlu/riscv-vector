@@ -572,6 +572,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // return resp
   io.nextCycleWb := mshrs.io.nextCycleWb
+  io.nextSource  := mshrs.io.nextSourceId
   io.resp.valid  := s1_cacheResp.valid | mshrsResp.valid
   io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
 
