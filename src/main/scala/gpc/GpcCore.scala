@@ -258,11 +258,13 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val wb_reg_wdata = Reg(Vec(2, UInt(xLen.W)))
     val wb_reg_vissue = Reg(new VIssue)
 
+    val take_pc_ex_p0 = Wire(Bool())
     val take_pc_ex_p1 = Wire(Bool())
+    val take_pc_ex = take_pc_ex_p0 || take_pc_ex_p1
     val take_pc_m2_p0 = Wire(Bool())
     val take_pc_m2_p1 = Wire(Bool())
     val take_pc_m2 = take_pc_m2_p0 || take_pc_m2_p1
-    val take_pc_all = take_pc_ex_p1 || take_pc_m2
+    val take_pc_all = take_pc_ex || take_pc_m2
     val vxcpt_flush = Wire(Bool())
 
     /** ID stage:
@@ -612,7 +614,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     alu_p1.io.in1 := ex_p1_op1.asUInt
 
     //---- Branch/JAL(R) of EX stage ----
-    val ex_misprediction_sent = RegInit(false.B)
+    val ex_misprediction_sent_m1 = RegInit(false.B)
+    val ex_misprediction_sent_m2 = RegNext(ex_misprediction_sent_m1)
     val ex_br_ctrl = ex_reg_uops(1).ctrl
     val ex_jalx = ex_br_ctrl.jal || ex_br_ctrl.jalr
     val ex_cfi = ex_br_ctrl.branch || ex_br_ctrl.jal || ex_br_ctrl.jalr
@@ -631,8 +634,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val ex_cfi_taken = (ex_br_ctrl.branch && ex_br_taken) || ex_br_ctrl.jalr || ex_br_ctrl.jal
     val ex_direction_misprediction = ex_br_ctrl.branch && ex_br_taken =/= ex_reg_uops(1).btb_resp.bht.taken
     val ex_misprediction = ex_wrong_npc
-    take_pc_ex_p1 := ex_reg_valids(0) && !ex_reg_uops(0).xcpt_noIntrp && ex_reg_sfence ||
-      ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && ex_misprediction
+    take_pc_ex_p0 := ex_reg_valids(0) && !ex_reg_uops(0).xcpt_noIntrp && ex_reg_sfence
+    take_pc_ex_p1 := ex_reg_valids(1) && !ex_reg_uops(1).xcpt_noIntrp && ex_misprediction
 
     // multiplier and divider
     val div = Module(new MulDiv(if (pipelinedMul) mulDivParams.copy(mulUnroll = 0) else mulDivParams, width = xLen, aluFn = aluFn))
@@ -996,14 +999,13 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       replay_m2_dmem_p1 || replay_m2_load_use(1) || m2_reg_uops(1).replay)
 
     take_pc_m2_p0 := replay_m2(0) || m2_xcpt(0) || csr.io.eret || m2_reg_flush_pipe
-    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent //TODO - sfence adding
+    val take_pc_m2_cfi = m2_reg_valids(1) && m2_misprediction && !ex_misprediction_sent_m2 //TODO - sfence adding
     val take_pc_m2_p1_others = replay_m2(1) || m2_xcpt(1)
     take_pc_m2_p1 := take_pc_m2_cfi || take_pc_m2_p1_others
 
+    ex_misprediction_sent_m1 := false.B
     when(take_pc_ex_p1 && !take_pc_m2) {
-      ex_misprediction_sent := true.B
-    }.elsewhen(m2_reg_valids(1) && m2_misprediction) {
-      ex_misprediction_sent := false.B
+      ex_misprediction_sent_m1 := true.B
     }
 
     // M2 write arbitration
@@ -1124,19 +1126,19 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     val vsb_almost_full = hasFreeEntries(enqPtrVsb, deqPtrVsb) <= 3.U
 
     //---- Some M2 utils ----                         hit   p0/p1
-    def swap_select(swap: Bool, v0: Bool, v1: Bool): (Bool, Bool) = (v0 || v1, Mux(!swap, !v0, v1))
+    def swap_select(swap: Bool, v0: Bool, v1: Bool, take_pc_p0: Bool, take_pc_p1: Bool): (Bool, Bool) = (Mux(swap, v0 && !take_pc_p1 || v1, v0 || v1 && !take_pc_p0), Mux(!swap, !v0, v1))
 
-    def swap_select(swap: Bool, v: Seq[Bool]): (Bool, Bool) = swap_select(swap, v(0), v(1))
+    def swap_select(swap: Bool, v: Seq[Bool], take_pc_p0: Bool, take_pc_p1: Bool): (Bool, Bool) = swap_select(swap, v(0), v(1), take_pc_p0, take_pc_p1)
 
     // val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => !ctrl_killm2(i) && m2_xcpt(i)))
-    val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => m2_xcpt(i)))
+    val m2_xcpt_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => m2_xcpt(i)), take_pc_m2_p0, take_pc_m2_p1)
 
     def m2_xcpt_data_select[T <: Data](d: Seq[T]) = Mux(m2_xcpt_select._2, d(1), d(0))
 
     val m2_cause_select = m2_xcpt_data_select(m2_cause)
     val m2_pc_xcpt_select = Mux(vxcpt_flush, vsb(deqPtrVsb.value).pc, m2_xcpt_data_select(m2_reg_uops.map(_.pc)))
 
-    val m2_replay_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => replay_m2(i)))
+    val m2_replay_select = swap_select(m2_reg_swap, Seq.tabulate(2)(i => replay_m2(i)), take_pc_m2_p0, take_pc_m2_p1)
 
     def m2_replay_data_select[T <: Data](d: Seq[T]) = Mux(m2_replay_select._2, d(1), d(0))
 
@@ -1373,12 +1375,12 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.vissue := wb_reg_vissue
 
     io.imem.req.valid := take_pc_all
-    io.imem.req.bits.speculative := take_pc_ex_p1 || take_pc_m2_cfi
+    io.imem.req.bits.speculative := take_pc_ex || take_pc_m2_cfi
     io.imem.req.bits.pc :=
       Mux(csr.io.exception || csr.io.eret, csr.io.evec, // exception or [m|s]ret
         Mux(m2_replay_select._1, m2_pc_replay_select, // replay
           Mux(m2_reg_flush_pipe, m2_npc_flush,
-            Mux(take_pc_ex_p1, ex_npc, m2_npc)))) //FIXME - m2_npc   // flush or branch misprediction
+            Mux(take_pc_ex, ex_npc, m2_npc)))) //FIXME - m2_npc   // flush or branch misprediction
     io.imem.flush_icache := m2_reg_valids(0) && m2_reg_uops(0).ctrl.fence_i && !io.dmem.s2_nack
     io.imem.might_request := take_pc_all || {
       imem_might_request_reg := id_pc_valids.orR || m1_pc_valids.orR || io.ptw.customCSRs.disableICacheClockGate
@@ -1396,7 +1398,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.imem.sfence.bits.asid := m2_p0_rs(1)
     io.ptw.sfence := io.imem.sfence
 
-    val m2_take_pc_select = swap_select(m2_reg_swap, take_pc_m2_p0, take_pc_m2_p1)
+    val m2_take_pc_select = swap_select(m2_reg_swap, take_pc_m2_p0, take_pc_m2_p1, take_pc_m2_p0, take_pc_m2_p1)
     val m2_take_pc_is_p1 = m2_take_pc_select._1 && m2_take_pc_select._2
     val mispredict_m2 = m2_take_pc_is_p1 && !take_pc_m2_p1_others
     val mispredict_hit = take_pc_ex_p1 || mispredict_m2
@@ -1579,6 +1581,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       ver_module.io.uvm_in.ll_fp_waddr := VecInit(wr0_addr, wr1_addr) // todo: vector to be added
       ver_module.io.uvm_in.ll_fp_wdata := VecInit(wr0_data, wr1_data)
       ver_module.io.uvm_in.swap := wb_reg_swap
+      ver_module.io.uvm_in.trap_valid := m2_xcpt_select._1
 
       for (i <- 0 until 2) {
         ver_module.io.uvm_in.rob_enq(i).valid := wb_reg_valids(i)

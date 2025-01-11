@@ -98,6 +98,7 @@ class ROBWb(implicit p: Parameters) extends CoreBundle()(p) {
 
 class VerInIO(implicit p: Parameters) extends CoreBundle()(p) {
   val swap = Input(Bool())
+  val trap_valid = Input(Bool())
   val rob_enq = Input(Vec(NRET, ValidIO(new ROBEnq)))
   val m2_xcpt = Input(Vec(NRET, Bool()))
   val m2_cause = Input(Vec(NRET, UInt(xLen.W)))
@@ -330,7 +331,7 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
     pass := true.B
   }
 
-  io.uvm_out.trap_valid := RegNext(RegNext(io.uvm_in.m2_xcpt.reduce(_ || _)))
-  io.uvm_out.trap_code := RegNext(RegNext(Mux(io.uvm_in.m2_xcpt(0), io.uvm_in.m2_cause(0), io.uvm_in.m2_cause(1))))
+  io.uvm_out.trap_valid := RegNext(RegNext(io.uvm_in.trap_valid))
+  io.uvm_out.trap_code := Mux(RegNext(RegNext(io.uvm_in.m2_xcpt(0))), commit_bits(0).csr.mcause, commit_bits(1).csr.mcause)
   io.uvm_out.sim_halt := pass
 }
