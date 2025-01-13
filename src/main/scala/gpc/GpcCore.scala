@@ -1182,7 +1182,7 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
     io.ptw.gstatus := csr.io.gstatus
     io.ptw.pmp := csr.io.pmp
 
-    val m2_valid_final_p0 = m2_reg_valids(0) && !(m2_reg_swap && m2_xcpt(1))
+    val m2_valid_final_p0 = m2_reg_valids(0) && !(m2_reg_swap && take_pc_m2_p1) && !replay_m2(0) && !m2_xcpt(0)
     csr.io.rw.addr := m2_reg_uops(0).inst(31, 20)
     csr.io.rw.cmd := CSR.maskCmd(m2_valid_final_p0, m2_reg_uops(0).ctrl.csr)
     csr.io.rw.wdata := aluM2_p0.io.out
