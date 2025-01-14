@@ -251,7 +251,7 @@ def updateChoicePHT(addr: UInt, d: BHTResp, taken: Bool): Unit = {
   private val not_taken_direction_wen = WireInit(resetting)
   private val direction_waddr = WireInit(reset_waddr)
   private val direction_wdata = WireInit(0.U)
-  private val tag_waddr = WireInit(reset_waddr)
+  private val tag_waddr = WireInit(reset_waddr.extract(params.nCountersPerEntry.log2 + params.nEntries.log2,params.nCountersPerEntry.log2))
   private val tag_wdata = WireInit(0.U)
 
   when(choice_wen){
