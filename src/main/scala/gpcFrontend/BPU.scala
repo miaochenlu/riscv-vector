@@ -204,17 +204,17 @@ def tag(addr: UInt) = {
 }
 
 //look up for BHT results
-def getresult(addr: UInt, rvalid: Bool): BHTResp = {
+def getresult(addr: UInt): BHTResp = {
   val res = Wire(new BHTResp)
-  val tag_taken_rdata = taken_tag_array.read(entryIdx(addr,globalHistory),rvalid && !taken_direction_wen)        //TODO:need complete
-  val tag_not_taken_rdata = not_taken_tag_array.read(entryIdx(addr,globalHistory),rvalid && !not_taken_direction_wen)
-  val taken_array_rdata = taken_array.read(dataIdx(addr,globalHistory),rvalid && !taken_direction_wen)
-  val not_taken_array_rdata = not_taken_array.read(dataIdx(addr,globalHistory),rvalid && !not_taken_direction_wen)
+  val tag_taken_rdata = taken_tag_array.read(entryIdx(addr,globalHistory))        
+  val tag_not_taken_rdata = not_taken_tag_array.read(entryIdx(addr,globalHistory))  
+  val taken_array_rdata = taken_array.read(dataIdx(addr,globalHistory)) 
+  val not_taken_array_rdata = not_taken_array.read(dataIdx(addr,globalHistory))  
   val s1_tag = RegNext(tag(addr))
   val takenTagMatch = s1_tag === tag_taken_rdata
   val notTakenTagMatch = s1_tag === tag_not_taken_rdata
   val choice_rdata = choice_array.read(addr.extract(log2Up(params.nEntries) + log2Up(params.entryLength) + log2Ceil(fetchBytes) - 1,
-                                                    log2Ceil(fetchBytes)),rvalid && !choice_wen)
+                                                    log2Ceil(fetchBytes))) 
   val tagHit = Mux(choice_rdata(1),notTakenTagMatch,takenTagMatch)
   val directionData = Mux(choice_rdata(1),not_taken_array_rdata,taken_array_rdata)
 
@@ -519,7 +519,7 @@ class BTB(implicit p: Parameters) extends BtbModule {
   if (btbParams.bhtParams.nonEmpty) {
     val bht = new BHT(Annotated.params(this, btbParams.bhtParams.get))
     val isBranch = (btbHit & cfiType.map(_ === CFIType.branch).asUInt).orR
-    val res = bht.getresult(s0_pc,s0_valid)
+    val res = bht.getresult(s0_pc)
     when (io.bht_update.valid) {
       when (io.bht_update.bits.branch) {
         when(!(io.bht_update.bits.prediction.hasBias && !io.bht_update.bits.mispredict)) {
