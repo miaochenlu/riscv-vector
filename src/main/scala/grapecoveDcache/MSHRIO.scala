@@ -36,7 +36,7 @@ class MSHREntryIO extends Bundle() {
   // probe permission
   val probeValid         = Input(Bool())
   val probeLineAddrMatch = Output(Bool())
-  val probePermission    = Input(UInt(TLPermissions.bdWidth.W))
+  val probePermission    = Input(UInt(TLPermissions.cWidth.W))
   val probeState         = Output(UInt(ProbeMSHRState.width.W))
 }
 
@@ -127,7 +127,7 @@ class RefillMSHRFile extends Bundle() {
 
 class ProbeMSHRFile extends Bundle() {
   val valid           = Input(Bool())
-  val probePermission = Input(UInt(TLPermissions.bdWidth.W))
+  val probePermission = Input(UInt(TLPermissions.cWidth.W))
   val lineAddr        = Input(UInt(lineAddrWidth.W))
 
   val pass     = Output(Bool())
