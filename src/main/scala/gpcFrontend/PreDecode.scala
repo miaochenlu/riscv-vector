@@ -120,8 +120,8 @@ class PreDecoder(implicit p: Parameters) extends CoreModule{
     when (io.inst_mask(i) && (isJump(io.inst_exp(i)))) {
         jump_target := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i))).asUInt
     }
-
-    when (!io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i)) || isBr(io.inst_exp(i)) && io.btb_resp.bits.bht.taken) ||
+//!io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i)) || isBr(io.inst_exp(i)) && io.btb_resp.bits.bht.taken) ||
+    when (
             !io.btb_resp.bits.bht.taken && io.btb_resp.valid && io.inst_mask(i) && (isJump(io.inst_exp(i))) ||
             io.btb_resp.valid && io.btb_resp.bits.bht.taken && io.inst_mask(i) && (isJump(io.inst_exp(i))) && (io.btb_resp.bits.target =/= jump_target)){
                 io.predict_npc := (io.inst_pcs(i).asSInt + ImmGen(IMM_UJ,io.inst_exp(i))).asUInt
