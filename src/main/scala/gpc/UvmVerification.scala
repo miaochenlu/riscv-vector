@@ -332,6 +332,6 @@ class UvmVerification(implicit p: Parameters) extends CoreModule {
   }
 
   io.uvm_out.trap_valid := RegNext(RegNext(io.uvm_in.trap_valid))
-  io.uvm_out.trap_code := Mux(RegNext(RegNext(io.uvm_in.m2_xcpt(0))), commit_bits(0).csr.mcause, commit_bits(1).csr.mcause)
+  io.uvm_out.trap_code := RegNext(io.uvm_in.csr.mcause)
   io.uvm_out.sim_halt := pass
 }
