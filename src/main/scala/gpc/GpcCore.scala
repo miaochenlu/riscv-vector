@@ -1380,7 +1380,8 @@ class Gpc(tile: GpcTile)(implicit p: Parameters) extends CoreModule()(p)
       Mux(csr.io.exception || csr.io.eret, csr.io.evec, // exception or [m|s]ret
         Mux(m2_replay_select._1, m2_pc_replay_select, // replay
           Mux(m2_reg_flush_pipe, m2_npc_flush,
-            Mux(take_pc_ex, ex_npc, m2_npc)))) //FIXME - m2_npc   // flush or branch misprediction
+            Mux(take_pc_m2_cfi, m2_npc,
+              Mux(take_pc_ex, ex_npc, m2_npc))))) //FIXME - m2_npc   // flush or branch misprediction
     io.imem.flush_icache := m2_reg_valids(0) && m2_reg_uops(0).ctrl.fence_i && !io.dmem.s2_nack
     io.imem.might_request := take_pc_all || {
       imem_might_request_reg := id_pc_valids.orR || m1_pc_valids.orR || io.ptw.customCSRs.disableICacheClockGate
