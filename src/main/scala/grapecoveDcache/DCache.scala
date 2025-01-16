@@ -429,7 +429,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
   // mshr get store data in s2
   val s2_upgradePermMiss = RegNext(s1_upgradePermMiss)
   val s2_mshrStoreData   = Mux(isAMO(s2_req.cmd), s2_data, Mux(s2_upgradePermMiss, s2_mergeStoreData, s2_req.wdata))
-  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss, Fill(dataBytes, 1.U), s2_req.wmask)
+  val s2_mshrStoreMaskInBytes = Mux(s2_upgradePermMiss && !isAMO(s2_req.cmd), Fill(dataBytes, 1.U), s2_req.wmask)
 
   mshrs.io.req.valid := s1_mshrAlloc
 
@@ -572,6 +572,7 @@ class GPCDCacheImp(outer: BaseDCache) extends BaseDCacheImp(outer) {
 
   // return resp
   io.nextCycleWb := mshrs.io.nextCycleWb
+  io.nextSource  := mshrs.io.nextSourceId
   io.resp.valid  := s1_cacheResp.valid | mshrsResp.valid
   io.resp.bits   := Mux(s1_cacheResp.valid, s1_cacheResp.bits, mshrsResp.bits)
 

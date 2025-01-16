@@ -92,9 +92,8 @@ class ProbeQueue(
   io.wbReq.bits.data      := DontCare // FIXME
   io.wbReq.bits.hasData   := false.B
 
-  io.memProbe.ready := (state === s_invalid) &&
-    (!io.lrscAddr.valid ||
-      io.lrscAddr.bits =/= getLineAddr(io.memProbe.bits.address))
-
-  assert(io.memProbe.bits.opcode === TLMessages.Probe || ~io.memProbe.valid)
+  io.memProbe.ready :=
+    (state === s_invalid) &&
+      (!io.lrscAddr.valid ||
+        io.lrscAddr.bits =/= getLineAddr(io.memProbe.bits.address))
 }
